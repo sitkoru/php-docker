@@ -31,6 +31,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          build-args: |
+            PHP_VERSION=${{ matrix.version }}
           target: dev
       - name: Build ssh image
         uses: docker/build-push-action@v2.7.0
@@ -38,6 +40,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          build-args: |
+            PHP_VERSION=${{ matrix.version }}
           target: ssh
       - name: Build nginx image
         uses: docker/build-push-action@v2.7.0
@@ -45,6 +49,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          build-args: |
+            PHP_VERSION=${{ matrix.version }}
           target: with-nginx
       - name: Build nginx with ssh image
         uses: docker/build-push-action@v2.7.0
@@ -52,6 +58,8 @@ jobs:
           context: .
           file: ./Dockerfile
           push: false
+          build-args: |
+            PHP_VERSION=${{ matrix.version }}
           target: with-nginx-ssh
 
   release:
