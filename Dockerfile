@@ -104,7 +104,7 @@ RUN chmod a+x ./install.sh && ./install.sh
 ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
 
-RUN rm /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/*
 COPY nginx/php.conf /etc/nginx/php.conf
 
 EXPOSE 80
@@ -120,7 +120,7 @@ RUN chmod a+x ./install.sh && ./install.sh
 ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
 
-RUN rm /etc/nginx/conf.d/default.conf
+RUN rm -f /etc/nginx/conf.d/*
 COPY nginx/php.conf /etc/nginx/php.conf
 
 EXPOSE 80
