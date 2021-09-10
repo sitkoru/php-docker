@@ -138,3 +138,25 @@ COPY nginx/php.conf /etc/nginx/php.conf
 EXPOSE 80
 
 CMD "/usr/bin/docker-entrypoint.sh"
+
+FROM ssh as with-nginx-ssh
+
+COPY --from=nginx-build /nginx/nginx_*.deb /_pkgs/
+
+RUN apt-get update \
+    && apt-get install -y lsb-base gnupg1 ca-certificates gettext-base curl \
+    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list
+
+
+RUN dpkg --install /_pkgs/*.deb && rm -rf /_pkgs
+
+ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
+RUN chmod +x /usr/bin/docker-entrypoint.sh
+
+RUN rm /etc/nginx/conf.d/default.conf
+COPY nginx/php.conf /etc/nginx/php.conf
+
+EXPOSE 80
+
+CMD "/usr/bin/docker-entrypoint.sh"
+
