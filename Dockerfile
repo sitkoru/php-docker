@@ -93,41 +93,13 @@ RUN sed -i "s/UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/ssh
 
 CMD ["/docker-entrypoint.sh"]
 
-# NGINX BASE IMAGE
-
-FROM nginx:latest as nginx-build
-
-ENV OSSL_VERSION 1.1.1g
-ENV CODENAME buster
-
-RUN apt-get update \
-    && apt-get install -y build-essential zlib1g-dev libpcre3 libpcre3-dev unzip wget libcurl4-openssl-dev libjansson-dev uuid-dev libbrotli-dev
-
-RUN wget http://nginx.org/keys/nginx_signing.key \
-    && apt-key add nginx_signing.key \
-    && echo "deb http://nginx.org/packages/mainline/debian/ ${CODENAME} nginx" >> /etc/apt/sources.list \
-    && echo "deb-src http://nginx.org/packages/mainline/debian/ ${CODENAME} nginx" >> /etc/apt/sources.list \
-    && apt-get update \
-    && apt-get build-dep -y nginx=${NGINX_VERSION}-1
-
-WORKDIR /nginx
-
-ADD ./nginx/build.sh build.sh
-
-RUN chmod a+x ./build.sh && ./build.sh
-
 # NGINX IMAGE
 
 FROM fpm as with-nginx
 
-COPY --from=nginx-build /nginx/nginx_*.deb /_pkgs/
+ADD ./nginx/install.sh install.sh
 
-RUN apt-get update \
-    && apt-get install -y lsb-base gnupg1 ca-certificates gettext-base curl \
-    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list
-
-
-RUN dpkg --install /_pkgs/*.deb && rm -rf /_pkgs
+RUN chmod a+x ./install.sh && ./install.sh
 
 ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
@@ -141,14 +113,9 @@ CMD "/usr/bin/docker-entrypoint.sh"
 
 FROM ssh as with-nginx-ssh
 
-COPY --from=nginx-build /nginx/nginx_*.deb /_pkgs/
+ADD ./nginx/install.sh install.sh
 
-RUN apt-get update \
-    && apt-get install -y lsb-base gnupg1 ca-certificates gettext-base curl \
-    && apt-get remove --purge --auto-remove -y && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list.d/nginx.list
-
-
-RUN dpkg --install /_pkgs/*.deb && rm -rf /_pkgs
+RUN chmod a+x ./install.sh && ./install.sh
 
 ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
