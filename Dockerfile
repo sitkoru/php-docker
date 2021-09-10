@@ -63,7 +63,7 @@ COPY install_dev.sh /install_dev.sh
 
 RUN PHP_VERSION=${PHP_VERSION} bash /install_dev.sh
 
-COPY xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
+COPY xdebug.ini /usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
 
 RUN curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/bin -- --filename=composer
 
