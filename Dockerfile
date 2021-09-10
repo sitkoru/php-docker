@@ -59,13 +59,9 @@ CMD ["php-fpm"]
 
 FROM base as dev
 
-RUN apt update \
-    && apt install -y $PHPIZE_DEPS openssh-server git unzip rsync \
-    && pecl install xdebug ast \
-    && docker-php-ext-enable ast \
-    && apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+COPY install_dev.sh /install_dev.sh
+
+RUN PHP_VERSION=${PHP_VERSION} bash /install_dev.sh
 
 COPY xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 
