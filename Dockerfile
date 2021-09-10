@@ -46,7 +46,7 @@ COPY .bashrc /var/www/.bashrc
 
 RUN echo Europe/Moscow | tee /etc/timezone && dpkg-reconfigure --frontend noninteractive tzdata
 
-RUN rm /usr/local/etc/php-fpm.d/www.conf.default && rm /usr/local/etc/php-fpm.d/www.conf
+RUN rm -f /usr/local/etc/php-fpm.d/www.conf.default && rm -f /usr/local/etc/php-fpm.d/www.conf
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 RUN sed -i "s/php_version/php${PHP_VERSION}/g" /usr/local/etc/php-fpm.conf
 
