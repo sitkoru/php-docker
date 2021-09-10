@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/sitkoru/php-docker/compare/v1.13.0...v1.14.0) (2021-09-10)
+
+
+### Features
+
+* **ssh:** make nginx with ssh image ([d2a715b](https://github.com/sitkoru/php-docker/commit/d2a715b8d4706c4d669adc78f55981db2993f862))
+
 # [1.13.0](https://github.com/sitkoru/php-docker/compare/v1.12.0...v1.13.0) (2021-08-30)
 
 
