@@ -1,3 +1,17 @@
+# [1.15.0](https://github.com/sitkoru/php-docker/compare/v1.14.0...v1.15.0) (2021-09-10)
+
+
+### Bug Fixes
+
+* **files:** fix deleting files ([bb2defa](https://github.com/sitkoru/php-docker/commit/bb2defa10f33a57f003c6b6c3f3dd79190139b31))
+* **nginx:** fix cleaning nginx default configs ([9a770ae](https://github.com/sitkoru/php-docker/commit/9a770aee2485aa3ff512221f6f34529873ff80db))
+
+
+### Features
+
+* **nginx:** don't build nginx, install from repo ([3ca2c87](https://github.com/sitkoru/php-docker/commit/3ca2c8739878bf8d25ed2a603f9a24721919e8fe))
+* **php5:** add php 5.6.40 ([f5cc6ea](https://github.com/sitkoru/php-docker/commit/f5cc6ea205e938c0eed89710b0d0b46c23769e7a))
+
 # [1.14.0](https://github.com/sitkoru/php-docker/compare/v1.13.0...v1.14.0) (2021-09-10)
 
 
