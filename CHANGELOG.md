@@ -1,3 +1,15 @@
+## [1.15.1](https://github.com/sitkoru/php-docker/compare/v1.15.0...v1.15.1) (2021-09-10)
+
+
+### Bug Fixes
+
+* **ci:** pass version on every step of ci workflow ([344947b](https://github.com/sitkoru/php-docker/commit/344947b0f2e45d9ff027273c4cd3dc602314f3bf))
+* **ci:** upd setup-buildx-action ([a7e445e](https://github.com/sitkoru/php-docker/commit/a7e445e19bab7067dfcc24a9c32ed5f577b033cb))
+* **dev:** fix installing xdebug and ast ([eafa46e](https://github.com/sitkoru/php-docker/commit/eafa46ec0c6ebdd9a31adab31595d0694a8f1756))
+* **dev:** syntax fix in install_dev script ([5a36e7d](https://github.com/sitkoru/php-docker/commit/5a36e7d5c3cc02ecb2b6097416e7a6175b6490dc))
+* **dev:** use install_dev script in Dockerfile ([d7016b3](https://github.com/sitkoru/php-docker/commit/d7016b35c67d14e49690d6dde15b06cd9ea1ff89))
+* **php5:** install old xdebug, don't install ast ([ad7f167](https://github.com/sitkoru/php-docker/commit/ad7f1671059f59453dd03d601313feab22b95ad4))
+
 # [1.15.0](https://github.com/sitkoru/php-docker/compare/v1.14.0...v1.15.0) (2021-09-10)
 
 
