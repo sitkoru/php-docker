@@ -1,3 +1,10 @@
+## [1.15.2](https://github.com/sitkoru/php-docker/compare/v1.15.1...v1.15.2) (2021-09-13)
+
+
+### Bug Fixes
+
+* **nginx:** remove all default sites ([4c032cf](https://github.com/sitkoru/php-docker/commit/4c032cf4b1b270e4f9e0485c8300bd9cb6524b08))
+
 ## [1.15.1](https://github.com/sitkoru/php-docker/compare/v1.15.0...v1.15.1) (2021-09-10)
 
 
