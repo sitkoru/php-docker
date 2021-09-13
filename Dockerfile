@@ -101,6 +101,8 @@ ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
 
 RUN rm -f /etc/nginx/conf.d/*
+RUN rm -f /etc/nginx/sites-available/*
+RUN rm -f /etc/nginx/sites-enabled/*
 COPY nginx/php.conf /etc/nginx/php.conf
 
 EXPOSE 80
@@ -117,6 +119,8 @@ ADD nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
 RUN chmod +x /usr/bin/docker-entrypoint.sh
 
 RUN rm -f /etc/nginx/conf.d/*
+RUN rm -f /etc/nginx/sites-available/*
+RUN rm -f /etc/nginx/sites-enabled/*
 COPY nginx/php.conf /etc/nginx/php.conf
 
 EXPOSE 80
