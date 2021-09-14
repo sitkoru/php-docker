@@ -1,3 +1,10 @@
+# [1.16.0](https://github.com/sitkoru/php-docker/compare/v1.15.2...v1.16.0) (2021-09-13)
+
+
+### Features
+
+* **nginx:** add default nginx settings ([e64e9ab](https://github.com/sitkoru/php-docker/commit/e64e9ab295de31b21edc2e1be32ac4012b4e6d66))
+
 ## [1.15.2](https://github.com/sitkoru/php-docker/compare/v1.15.1...v1.15.2) (2021-09-13)
 
 
