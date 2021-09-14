@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/sitkoru/php-docker/compare/v1.16.0...v1.16.1) (2021-09-14)
+
+
+### Bug Fixes
+
+* **nginx:** remove duplicate setting from global config ([e298646](https://github.com/sitkoru/php-docker/commit/e2986469ce7567d3c09d2ac842a87511cee70058))
+
 # [1.16.0](https://github.com/sitkoru/php-docker/compare/v1.15.2...v1.16.0) (2021-09-13)
 
 
