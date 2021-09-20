@@ -73,17 +73,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Install node.js
-        uses: actions/setup-node@v2.4.0
-        with:
-          node-version: "16"
       - name: Semantic Release
-        uses: cycjimmy/semantic-release-action@v2
-        with:
-          extra_plugins: |
-            @sitkoru/semantic-release-config
-            @semantic-release/changelog
-            @semantic-release/git
+        uses: sitkoru/semantic-release-action@v1
         env:
           GH_TOKEN: ${{ secrets.BOT_TOKEN }}
           GIT_AUTHOR_NAME: ${{ secrets.BOT_NAME }}
