@@ -1,3 +1,12 @@
+## [1.16.2](https://github.com/sitkoru/php-docker/compare/v1.16.1...v1.16.2) (2021-09-20)
+
+
+### Bug Fixes
+
+* **extensions:** fix php74 version pattern ([320d003](https://github.com/sitkoru/php-docker/commit/320d0035088575c05b53c78555d8568d785e4a72))
+* **gd:** fix configure gd for all versions < 8 ([4f37783](https://github.com/sitkoru/php-docker/commit/4f3778306fce75f7dfffc51f5b702cd9668ea6ec))
+* **gd:** fix gd installation for php7.4 ([4e28f45](https://github.com/sitkoru/php-docker/commit/4e28f452e72e045b680bc8f53244ef26d5765f16))
+
 ## [1.16.1](https://github.com/sitkoru/php-docker/compare/v1.16.0...v1.16.1) (2021-09-14)
 
 
