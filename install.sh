@@ -3,7 +3,7 @@ php8pattern="8.*.*"
 php5pattern="5.6.*"
 php7pattern="7.*.*"
 php73pattern="7.3.*"
-php74pattern="7.3.*"
+php74pattern="7.4.*"
 apt update && apt install -y \
     libxml2-dev \
     zlib1g-dev \
