@@ -1,3 +1,10 @@
+# [1.17.0](https://github.com/sitkoru/php-docker/compare/v1.16.2...v1.17.0) (2021-09-22)
+
+
+### Features
+
+* **nginx:** replace global.conf with nginx.conf ([9351b52](https://github.com/sitkoru/php-docker/commit/9351b52fa769630e5bbade942fc7c87dd784b71b))
+
 ## [1.16.2](https://github.com/sitkoru/php-docker/compare/v1.16.1...v1.16.2) (2021-09-20)
 
 
