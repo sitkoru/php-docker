@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/sitkoru/php-docker/compare/v1.17.0...v1.18.0) (2021-09-24)
+
+
+### Features
+
+* **php:** 7.3.31, 7.4.24, 8.0.11 ([7ae7186](https://github.com/sitkoru/php-docker/commit/7ae7186372d212c2085ed4253de85d5e413aa187))
+
 # [1.17.0](https://github.com/sitkoru/php-docker/compare/v1.16.2...v1.17.0) (2021-09-22)
 
 
