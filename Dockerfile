@@ -105,6 +105,7 @@ RUN rm -f /etc/nginx/sites-available/*
 RUN rm -f /etc/nginx/sites-enabled/*
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/php.conf /etc/nginx/php.conf
+COPY nginx/php_fastcgi.conf /etc/nginx/php_fastcgi.conf
 
 EXPOSE 80
 
@@ -124,6 +125,7 @@ RUN rm -f /etc/nginx/sites-available/*
 RUN rm -f /etc/nginx/sites-enabled/*
 COPY nginx/nginx.conf /etc/nginx/nginx.conf
 COPY nginx/php.conf /etc/nginx/php.conf
+COPY nginx/php_fastcgi.conf /etc/nginx/php_fastcgi.conf
 
 EXPOSE 80
 
