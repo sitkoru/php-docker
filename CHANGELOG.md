@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/sitkoru/php-docker/compare/v1.18.0...v1.19.0) (2021-09-24)
+
+
+### Features
+
+* **nginx:** split php include to allow adding fastcgi_options ([a70092a](https://github.com/sitkoru/php-docker/commit/a70092a8af10c0aece5398741f5f1196a74f5b4c))
+
 # [1.18.0](https://github.com/sitkoru/php-docker/compare/v1.17.0...v1.18.0) (2021-09-24)
 
 
