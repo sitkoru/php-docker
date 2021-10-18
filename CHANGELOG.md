@@ -1,3 +1,15 @@
+# [1.20.0](https://github.com/sitkoru/php-docker/compare/v1.19.0...v1.20.0) (2021-10-18)
+
+
+### Bug Fixes
+
+* **certs:** run apt upgrade to install latests certs ([99a2fd6](https://github.com/sitkoru/php-docker/commit/99a2fd69ff656c3c2dd0b4dd6ad35d744f04f50b))
+
+
+### Features
+
+* **nginx:** map scheme and port from proxy to fastcgi ([4c7f173](https://github.com/sitkoru/php-docker/commit/4c7f1736372d73e20c054a1ed7b254a485c94ee2))
+
 # [1.19.0](https://github.com/sitkoru/php-docker/compare/v1.18.0...v1.19.0) (2021-09-24)
 
 
