@@ -3,7 +3,7 @@ FROM php:${PHP_VERSION}-fpm as build
 
 ENV LANG=C.UTF-8
 
-RUN apt update && apt install -y gnupg
+RUN apt update && apt upgrade -y && apt install -y gnupg
 
 RUN echo deb http://apt.postgresql.org/pub/repos/apt/ stretch-pgdg main > /etc/apt/sources.list.d/pgdg.list
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add -
@@ -14,8 +14,9 @@ RUN PHP_VERSION=${PHP_VERSION} bash /install.sh
 
 FROM php:${PHP_VERSION}-fpm as base
 
-RUN apt-get update \
-    && apt-get install -y bash-completion wget zip msmtp  \
+RUN apt update \
+    && apt upgrade -y \
+    && apt install -y bash-completion wget zip msmtp  \
     libpng16-16 \ 
     libjpeg62-turbo \
     libfreetype6 \
