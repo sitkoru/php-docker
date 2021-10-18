@@ -27,7 +27,7 @@ RUN apt update \
     libmemcached11 \
     libmemcachedutil2 \
     && apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
-    && apt-get clean \
+    && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
     
 RUN echo ru_RU.UTF-8 UTF-8 >> /etc/locale.gen
@@ -79,7 +79,7 @@ RUN chmod +x /docker-entrypoint.sh
 
 RUN apt update \
     && apt install -y openssh-server rsync \
-    && apt-get clean \
+    && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN mkdir /run/sshd
