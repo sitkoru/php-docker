@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [5.6.40, 7.3.31, 7.4.24, 8.0.11]
+        version: [5.6.40, 7.3.31, 7.4.25, 8.0.11]
     steps:
       - uses: actions/checkout@v2
       - name: Set up Docker Buildx
