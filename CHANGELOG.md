@@ -1,3 +1,16 @@
+# [1.21.0](https://github.com/sitkoru/php-docker/compare/v1.20.0...v1.21.0) (2021-10-25)
+
+
+### Bug Fixes
+
+* **nginx:** fix mapping https ([7793619](https://github.com/sitkoru/php-docker/commit/77936195860591fd4379ae2f31b058f0d9dbefaf))
+
+
+### Features
+
+* **php:** PHP 7.4.25 ([ad1f1a5](https://github.com/sitkoru/php-docker/commit/ad1f1a58c13835b91707c2c4a9d44812d192167a))
+* **php:** PHP 8.0.12 ([bcf7127](https://github.com/sitkoru/php-docker/commit/bcf7127c2f0bc50abb9f32df4e63a2e4a0ec8806))
+
 # [1.20.0](https://github.com/sitkoru/php-docker/compare/v1.19.0...v1.20.0) (2021-10-18)
 
 
