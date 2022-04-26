@@ -1,3 +1,10 @@
+# [1.24.0](https://github.com/sitkoru/php-docker/compare/v1.23.0...v1.24.0) (2022-04-26)
+
+
+### Features
+
+* **php:** PHP 7.4.29 and 8.0.18 ([f17546c](https://github.com/sitkoru/php-docker/commit/f17546c5fef19a14d36f2f0aea56fd4d3deacd93))
+
 # [1.23.0](https://github.com/sitkoru/php-docker/compare/v1.22.0...v1.23.0) (2022-03-29)
 
 
