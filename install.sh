@@ -2,6 +2,8 @@
 php8pattern="8.*.*"
 php5pattern="5.6.*"
 php7pattern="7.*.*"
+php71pattern="7.1.*"
+php72pattern="7.2.*"
 php73pattern="7.3.*"
 php74pattern="7.4.*"
 apt update && apt install -y \
@@ -21,14 +23,16 @@ apt update && apt install -y \
     && docker-php-source extract \
     && if [[ $PHP_VERSION =~ $php5pattern ]]; then pecl bundle -d /usr/src/php/ext redis-4.0.0; else pecl bundle -d /usr/src/php/ext redis; fi \
     && docker-php-ext-install -j$(nproc) redis \
-    && if [[ ! $PHP_VERSION =~ $php5pattern ]]; then pecl bundle -d /usr/src/php/ext mongodb; fi \
-    && if [[ ! $PHP_VERSION =~ $php5pattern ]]; then docker-php-ext-install -j$(nproc) mongodb; fi \
-    && if [[ ! $PHP_VERSION =~ $php5pattern ]]; then pecl bundle -d /usr/src/php/ext grpc; fi \
-    && if [[ ! $PHP_VERSION =~ $php5pattern ]]; then docker-php-ext-install -j$(nproc) grpc; fi \
+    && if [[ ! $PHP_VERSION =~ $php5pattern ]] && [[ ! $PHP_VERSION =~ $php71pattern ]] && [[ ! $PHP_VERSION =~ $php72pattern ]]; then pecl bundle -d /usr/src/php/ext mongodb; fi \
+    && if [[ ! $PHP_VERSION =~ $php5pattern ]] && [[ ! $PHP_VERSION =~ $php71pattern ]] && [[ ! $PHP_VERSION =~ $php72pattern ]]; then docker-php-ext-install -j$(nproc) mongodb; fi \
+    && if [[ ! $PHP_VERSION =~ $php5pattern ]] && [[ ! $PHP_VERSION =~ $php71pattern ]] && [[ ! $PHP_VERSION =~ $php72pattern ]]; then pecl bundle -d /usr/src/php/ext grpc; fi \
+    && if [[ ! $PHP_VERSION =~ $php5pattern ]] && [[ ! $PHP_VERSION =~ $php71pattern ]] && [[ ! $PHP_VERSION =~ $php72pattern ]]; then docker-php-ext-install -j$(nproc) grpc; fi \
     && if [[ $PHP_VERSION =~ $php5pattern ]]; then pecl bundle -d /usr/src/php/ext memcached-2.2.0; else pecl bundle -d /usr/src/php/ext memcached-3.1.5; fi \
     && docker-php-ext-install -j$(nproc) memcached \
     && docker-php-ext-configure gmp \
     && if [[ $PHP_VERSION =~ $php5pattern ]]; then docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/; fi \
+    && if [[ $PHP_VERSION =~ $php71pattern ]]; then docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/; fi \
+    && if [[ $PHP_VERSION =~ $php72pattern ]]; then docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/; fi \
     && if [[ $PHP_VERSION =~ $php73pattern ]]; then docker-php-ext-configure gd --with-freetype-dir=/usr/include/ --with-jpeg-dir=/usr/include/; fi \
     && if [[ $PHP_VERSION =~ $php74pattern ]]; then docker-php-ext-configure gd --with-freetype --with-jpeg; fi \
     && if [[ $PHP_VERSION =~ $php8pattern ]]; then docker-php-ext-configure gd --with-freetype --with-jpeg; fi \
