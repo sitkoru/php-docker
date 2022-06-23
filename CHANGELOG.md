@@ -1,3 +1,17 @@
+# [1.25.0](https://github.com/sitkoru/php-docker/compare/v1.24.0...v1.25.0) (2022-06-23)
+
+
+### Bug Fixes
+
+* add 7.1 pattern ([c2c088c](https://github.com/sitkoru/php-docker/commit/c2c088c8f83439039169f2302d1ea9a5356b1565))
+* install xdebug 2.9.8 to 7.1 ([051cbb4](https://github.com/sitkoru/php-docker/commit/051cbb406c80a06606768ea1657adca8d5195be9))
+* no mongo in 7.1 and 7.2, fix gd for 7.1 and 7.2 ([5cdcd6a](https://github.com/sitkoru/php-docker/commit/5cdcd6a17864c7a2851dc2f7a34997f8eae61f95))
+
+
+### Features
+
+* support php 7.1 and 7.2 ([429a154](https://github.com/sitkoru/php-docker/commit/429a154dd03338fb4071d9cfe7a01acf5faa0eb3))
+
 # [1.24.0](https://github.com/sitkoru/php-docker/compare/v1.23.0...v1.24.0) (2022-04-26)
 
 
