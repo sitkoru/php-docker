@@ -51,7 +51,7 @@ jobs:
           username: ${{ secrets.BOT_NAME }}
           password: ${{ secrets.BOT_TOKEN }}
       - name: Build fpm image
-        uses: docker/build-push-action@v2.7.0
+        uses: docker/build-push-action@v3.1.0
         with:
           context: .
           file: ./Dockerfile
@@ -70,7 +70,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build dev image
-        uses: docker/build-push-action@v2.7.0
+        uses: docker/build-push-action@v3.1.0
         with:
           context: .
           file: ./Dockerfile
@@ -89,7 +89,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build ssh image
-        uses: docker/build-push-action@v2.7.0
+        uses: docker/build-push-action@v3.1.0
         with:
           context: .
           file: ./Dockerfile
@@ -108,7 +108,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx image
-        uses: docker/build-push-action@v2.7.0
+        uses: docker/build-push-action@v3.1.0
         with:
           context: .
           file: ./Dockerfile
@@ -127,7 +127,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx with ssh image
-        uses: docker/build-push-action@v2.7.0
+        uses: docker/build-push-action@v3.1.0
         with:
           context: .
           file: ./Dockerfile
