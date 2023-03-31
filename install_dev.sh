@@ -3,6 +3,7 @@ php5pattern="5.6.*"
 php7pattern="7.*.*"
 php71pattern="7.1.*"
 php73pattern="7.3.*"
+php74pattern="7.4.*"
 apt update \
     && apt install -y $PHPIZE_DEPS openssh-server git unzip rsync \
     && if [[ $PHP_VERSION =~ $php5pattern ]]; then pecl bundle -d /usr/src/php/ext xdebug-2.5.5; fi \
