@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [5.6.40, 7.1.33, 7.2.34, 7.3.33, 7.4.33, 8.0.28]
+        version: [7.4.33, 8.0.28, 8.1.17, 8.2.4]
     steps:
       - uses: actions/checkout@v3
       - name: Prepare

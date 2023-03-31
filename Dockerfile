@@ -16,16 +16,7 @@ FROM php:${PHP_VERSION}-fpm as base
 
 RUN apt update \
     && apt upgrade -y \
-    && apt install -y bash-completion wget zip msmtp  \
-    libpng16-16 \ 
-    libjpeg62-turbo \
-    libfreetype6 \
-    libpq5 \
-    libzip4 \
-    libxslt1.1 \
-    locales \
-    libmemcached11 \
-    libmemcachedutil2 \
+    && apt install -y bash-completion wget zip msmtp libpng16-16 libjpeg62-turbo libfreetype6 libpq5 libzip4 libxslt1.1 locales libmemcached11 libmemcachedutil2 \
     && apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
