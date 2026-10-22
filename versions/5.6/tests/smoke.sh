@@ -1,6 +1,6 @@
 #!/bin/sh
 set -eu
-php /checks/runtime.php
+php -d display_errors=stderr -d log_errors=0 /checks/runtime.php
 php -i > /tmp/php5-abi-check
 grep -qx 'PHP API => 20131106' /tmp/php5-abi-check
 grep -qx 'PHP Extension => 20131226' /tmp/php5-abi-check
