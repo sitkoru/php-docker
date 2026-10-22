@@ -117,7 +117,7 @@ FROM compiled AS regression
 COPY versions/5.6/tests/ /checks/
 RUN cd /usr/src/php \
     && sed -i 's/--disable-cgi/--enable-cgi/' config.nice \
-    && ./config.nice \
+    && ./config.nice "CFLAGS=$PHP_CFLAGS" "CPPFLAGS=$PHP_CPPFLAGS" "LDFLAGS=$PHP_LDFLAGS" \
     && make -j2 sapi/cgi/php-cgi \
     && sh /checks/phpt.sh
 
