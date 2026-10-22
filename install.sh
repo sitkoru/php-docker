@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euxo pipefail
 apt-get update
-apt-get install -y --no-install-recommends $PHPIZE_DEPS libxml2-dev zlib1g-dev libfreetype6-dev libjpeg-dev libpng-dev libxslt-dev libpq-dev libzip-dev libmemcached-dev libgmp-dev libicu-dev binutils
+apt-get install -y --no-install-recommends $PHPIZE_DEPS libxml2-dev zlib1g-dev libfreetype6-dev libjpeg-dev libpng-dev libxslt-dev libpq-dev libzip-dev libmemcached-dev libgmp-dev libicu-dev libssl-dev binutils
 docker-php-source extract
 for extension in redis-6.0.2 mongodb-1.20.1 grpc-1.62.0 memcached-3.2.0; do
     pecl bundle -d /usr/src/php/ext "$extension"

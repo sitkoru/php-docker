@@ -18,8 +18,7 @@ def docker(*args, **kwargs):
 def record(kind, data):
     return struct.pack('!BBHHBB', 1, kind, 1, len(data), 0, 0) + data
 
-modules = 'bcmath exif gd gmp grpc intl memcache memcached mongodb mysqli pcntl pdo_mysql pdo_pgsql pgsql redis soap sodium xsl zip Zend OPcache'.split()
-modules = modules[:-2] + ['Zend OPcache']
+modules = 'bcmath exif gd gmp grpc intl memcache memcached mongodb mysqli pcntl pdo_mysql pdo_pgsql pgsql redis soap sodium xsl zip'.split() + ['Zend OPcache']
 if target == 'dev':
     modules += ['xdebug', 'ast']
 actual = docker('run', '--rm', image, 'php', '-m', capture_output=True).stdout.splitlines()
