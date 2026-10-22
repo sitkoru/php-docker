@@ -11,11 +11,21 @@ import uuid
 image, target = sys.argv[1:]
 name = 'php-verify-' + uuid.uuid4().hex[:12]
 def docker(*args, **kwargs):
+    cleanup_name = None
     if args[0] == 'run':
         args = (args[0], '--memory=256m', '--pids-limit=64', *args[1:])
         if '-p' not in args:
             args = (args[0], '--network=none', *args[1:])
-    return subprocess.run(['docker', *args], check=True, text=True, timeout=60, **kwargs)
+        if '-d' not in args:
+            cleanup_name = 'php-cli-' + uuid.uuid4().hex[:12]
+            args = (args[0], '--name', cleanup_name, *args[1:])
+    try:
+        return subprocess.run(['docker', *args], check=kwargs.pop('check', True), text=True,
+                              timeout=kwargs.pop('timeout', 60), **kwargs)
+    finally:
+        if cleanup_name:
+            subprocess.run(['docker', 'rm', '-f', cleanup_name], check=False,
+                           stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
 
 def record(kind, data):
     return struct.pack('!BBHHBB', 1, kind, 1, len(data), 0, 0) + data
@@ -33,7 +43,7 @@ if target.startswith('with-nginx'):
 # EOL backport меняет OOM-семантику; поддерживаемая 8.2 использует другое исправление.
 if docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;', capture_output=True).stdout != '8.2':
     code = open(os.path.join(os.path.dirname(__file__), 'oom.php')).read().replace('<?php', '', 1)
-    oom = subprocess.run(['docker', 'run', '--memory=128m', '--pids-limit=32', '--network=none', '--rm', image, 'php', '-d', 'memory_limit=16M', '-r', code], text=True, capture_output=True, timeout=30)
+    oom = docker('run', '--rm', image, 'php', '-d', 'memory_limit=16M', '-r', code, check=False, capture_output=True, timeout=30)
     assert oom.returncode == 1, oom
     assert 'Allowed memory size' in oom.stdout + oom.stderr, oom
     assert 'UNSAFE_SHUTDOWN' not in oom.stdout + oom.stderr, oom
