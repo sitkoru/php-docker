@@ -63,7 +63,7 @@ RUN docker-php-source delete \
     && rm -rf /patches /usr/local/bin/build-php \
     && apt-mark auto $PHPIZE_DEPS patch libcurl4-openssl-dev libedit-dev libsqlite3-dev libssl1.0-dev \
         libxml2-dev zlib1g-dev libfreetype6-dev libjpeg-dev libpng-dev libxslt-dev libpq-dev libicu-dev libmemcached-dev \
-    && find /usr/local -type f -executable -exec ldd '{}' ';' 2>/dev/null \
+    && find /usr/local -type f \( -executable -o -name '*.so' \) -exec ldd '{}' ';' 2>/dev/null \
         | awk '/=>/ { print $(NF-1) }' | sort -u | xargs -r dpkg-query --search \
         | cut -d: -f1 | sort -u | xargs -r apt-mark manual \
     && apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false \
