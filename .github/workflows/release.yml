@@ -9,9 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [7.4.33, 8.0.29, 8.1.20, 8.2.7]
+        include:
+          - {version: 7.4.33, branch: "7.4"}
+          - {version: 8.0.30, branch: "8.0"}
+          - {version: 8.1.34, branch: "8.1"}
+          - {version: 8.2.35, branch: "8.2"}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7.0.1
       - name: Prepare
         id: prep
         run: |
@@ -28,7 +32,7 @@ jobs:
             TAGS_DEV="${DOCKER_IMAGE}:${VERSION}-dev,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-dev"
             TAGS_SSH="${DOCKER_IMAGE}:${VERSION}-ssh,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-ssh"
             TAGS_NGINX="${DOCKER_IMAGE}:${VERSION}-nginx,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx"
-            TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-nginx,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx"
+            TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-nginx-ssh,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx-ssh"
           else
             TAGS="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}"
             TAGS_DEV="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-dev"
@@ -36,29 +40,27 @@ jobs:
             TAGS_NGINX="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-nginx"
             TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-nginx-ssh"
           fi
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=tags_dev::${TAGS_DEV}
-          echo ::set-output name=tags_ssh::${TAGS_SSH}
-          echo ::set-output name=tags_nginx::${TAGS_NGINX}
-          echo ::set-output name=tags_nginx_ssh::${TAGS_NGINX_SSH}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "tags_dev=${TAGS_DEV}" >> "$GITHUB_OUTPUT"
+          echo "tags_ssh=${TAGS_SSH}" >> "$GITHUB_OUTPUT"
+          echo "tags_nginx=${TAGS_NGINX}" >> "$GITHUB_OUTPUT"
+          echo "tags_nginx_ssh=${TAGS_NGINX_SSH}" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ secrets.BOT_NAME }}
           password: ${{ secrets.BOT_TOKEN }}
       - name: Build fpm image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
           target: fpm
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -70,14 +72,12 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build dev image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_dev }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
           target: dev
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -89,14 +89,12 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_ssh }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
           target: ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -108,14 +106,12 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_nginx }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
           target: with-nginx
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -127,21 +123,68 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx with ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_nginx_ssh }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-          target: with-nginx
+          target: with-nginx-ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
             org.opencontainers.image.url=${{ github.event.repository.html_url }}
             org.opencontainers.image.source=${{ github.event.repository.clone_url }}
             org.opencontainers.image.version=${{ matrix.version }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
+
+
+  legacy:
+    name: Publish PHP 5.6 consumer tags
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {target: fpm, image: ghcr.io/sitkoru/php5}
+          - {target: dev, image: ghcr.io/sitkoru/php5-dev}
+          - {target: with-nginx, image: ghcr.io/sitkoru/php}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Preserve PHP 5.6 consumer tags
+        id: prep
+        env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if [ "$TARGET" = with-nginx ]; then
+            tags="$IMAGE:5.6-nginx,$IMAGE:5.6.40-nginx"
+          else
+            tags="$IMAGE:latest,$IMAGE:sha-${GITHUB_SHA::8}"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.BOT_NAME }}
+          password: ${{ secrets.BOT_TOKEN }}
+      - uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: versions/5.6/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
+          labels: |
+            org.opencontainers.image.title=${{ github.event.repository.name }}
+            org.opencontainers.image.description=${{ github.event.repository.description }}
+            org.opencontainers.image.url=${{ github.event.repository.html_url }}
+            org.opencontainers.image.source=${{ github.event.repository.clone_url }}
+            org.opencontainers.image.version=5.6.40
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}

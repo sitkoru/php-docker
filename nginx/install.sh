@@ -1,6 +1,10 @@
-wget http://nginx.org/keys/nginx_signing.key
-apt-key add nginx_signing.key
-CODENAME=$(grep "VERSION=" /etc/os-release |awk -F= {' print $2'}|sed s/\"//g |sed s/[0-9]//g | sed s/\)$//g |sed s/\(//g)
-echo "deb http://nginx.org/packages/mainline/debian/ ${CODENAME} nginx" >> /etc/apt/sources.list
-apt update
-apt install -y nginx --allow-unauthenticated
+#!/bin/bash
+set -euxo pipefail
+apt-get update
+apt-get install -y --no-install-recommends nginx
+apt-get clean
+rm -rf /var/lib/apt/lists/*
+rm -f /etc/nginx/conf.d/* /etc/nginx/sites-available/* /etc/nginx/sites-enabled/*
+cp /tmp/nginx/nginx.conf /tmp/nginx/php.conf /tmp/nginx/php_fastcgi.conf /etc/nginx/
+install -m 755 /tmp/nginx/docker-entrypoint.sh /usr/bin/docker-entrypoint.sh
+rm -rf /tmp/nginx
