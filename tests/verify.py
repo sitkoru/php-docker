@@ -10,13 +10,13 @@ import uuid
 
 image, target = sys.argv[1:]
 name = 'php-verify-' + uuid.uuid4().hex[:12]
-def docker(*args, **kwargs):
+def docker(*args, detached=False, **kwargs):
     cleanup_name = None
     if args[0] == 'run':
         args = (args[0], '--memory=256m', '--pids-limit=64', *args[1:])
         if '-p' not in args:
             args = (args[0], '--network=none', *args[1:])
-        if '-d' not in args:
+        if not detached:
             cleanup_name = 'php-cli-' + uuid.uuid4().hex[:12]
             args = (args[0], '--name', cleanup_name, *args[1:])
     try:
@@ -48,7 +48,7 @@ if docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MIN
     assert 'Allowed memory size' in oom.stdout + oom.stderr, oom
     assert 'UNSAFE_SHUTDOWN' not in oom.stdout + oom.stderr, oom
 try:
-    docker('run', '-d', '--name', name, '-p', '127.0.0.1::9000', image, 'php-fpm')
+    docker('run', '-d', '--name', name, '-p', '127.0.0.1::9000', image, 'php-fpm', detached=True)
     docker('exec', name, 'sh', '-c', "printf '%s' '<?php echo \"FPM_OK\";' > /tmp/health.php")
     port = int(docker('port', name, '9000', capture_output=True).stdout.strip().rsplit(':', 1)[1])
     params = {'SCRIPT_FILENAME': '/tmp/health.php', 'REQUEST_METHOD': 'GET', 'SERVER_PROTOCOL': 'HTTP/1.1', 'GATEWAY_INTERFACE': 'CGI/1.1'}
