@@ -1,5 +1,13 @@
-ARG PHP_VERSION=7
-FROM php:${PHP_VERSION}-fpm as build
+ARG PHP_VERSION=8.2.35
+ARG DEBIAN_VERSION=bookworm
+FROM php:${PHP_VERSION}-fpm-${DEBIAN_VERSION} AS upstream
+ARG PHP_VERSION
+# Bullseye security перенесён в архив после окончания LTS; подписи APT проверяются.
+RUN if [ -f /etc/apt/sources.list ]; then sed -i 's|http://deb.debian.org/debian-security|https://archive.debian.org/debian-security|g' /etc/apt/sources.list; fi
+
+FROM upstream AS build
+COPY rebuild-php.sh /rebuild-php.sh
+RUN bash /rebuild-php.sh
 
 ENV LANG=C.UTF-8
 
@@ -7,13 +15,16 @@ RUN apt update && apt upgrade -y && apt install -y gnupg
 
 COPY install.sh /install.sh
 
+RUN docker-php-source extract \
+    && TEST_PHP_EXECUTABLE=/usr/local/bin/php REPORT_EXIT_STATUS=1 php /usr/src/php/run-tests.php -q /usr/src/php/tests/basic/001.phpt /usr/src/php/ext/session/tests/session_basic1.phpt
+
 RUN PHP_VERSION=${PHP_VERSION} bash /install.sh
 
-FROM php:${PHP_VERSION}-fpm as base
+FROM upstream AS base
 
 RUN apt update \
     && apt upgrade -y \
-    && apt install -y bash-completion wget zip msmtp libpng16-16 libjpeg62-turbo libfreetype6 libpq5 libzip4 libxslt1.1 locales libmemcached11 libmemcachedutil2 \
+    && apt install -y bash-completion wget zip msmtp libpng16-16 libjpeg62-turbo libfreetype6 libpq5 libzip4 libxslt1.1 libgmp10 libicu-dev locales libmemcached11 libmemcachedutil2 \
     && apt purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false $PHPIZE_DEPS \
     && apt clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -25,8 +36,7 @@ RUN echo en_US.UTF-8 UTF-8 > /etc/locale.gen \
     && echo "LANGUAGE=ru_RU.UTF-8" >> /etc/default/locale \
     && echo "LC_ALL=ru_RU.UTF-8" >> /etc/default/locale
 
-COPY --from=build /usr/local/etc/php/conf.d /usr/local/etc/php/conf.d
-COPY --from=build /usr/local/lib/php/extensions /usr/local/lib/php/extensions
+COPY --from=build /usr/local/ /usr/local/
 
 COPY opcache.conf /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
 
@@ -46,7 +56,8 @@ WORKDIR /var/www
 
 CMD ["php-fpm"]
 
-FROM base as dev
+FROM base AS dev
+ARG PHP_VERSION
 
 COPY install_dev.sh /install_dev.sh
 
@@ -71,7 +82,7 @@ RUN apt update \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 RUN mkdir /run/sshd
-RUN sed -i "s/UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config \ 
+RUN sed -i "s/UsePrivilegeSeparation.*/UsePrivilegeSeparation no/g" /etc/ssh/sshd_config \
     && sed -i "s/UsePAM.*/UsePAM no/g" /etc/ssh/sshd_config \
     && sed -i "s/#PermitRootLogin.*/PermitRootLogin yes/g" /etc/ssh/sshd_config \
     && sed -i "s/#AuthorizedKeysFile/AuthorizedKeysFile/g" /etc/ssh/sshd_config

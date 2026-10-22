@@ -3,7 +3,7 @@ name: Main
 on:
   push:
     branches:
-      - "*"
+      - "**"
   pull_request:
 
 jobs:
@@ -11,65 +11,99 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [7.4.33, 8.0.29, 8.1.20, 8.2.7]
+        include:
+          - {version: 7.4.33, debian: bullseye}
+          - {version: 8.0.30, debian: bullseye}
+          - {version: 8.1.34, debian: bookworm}
+          - {version: 8.2.35, debian: bookworm}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7.0.1
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Build fpm image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
           push: false
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: fpm
+          load: true
+          platforms: linux/amd64
+          tags: php-verify:fpm
+      - name: Verify fpm
+        run: python3 tests/verify.py php-verify:fpm fpm
       - name: Build dev image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
           push: false
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: dev
+          load: true
+          platforms: linux/amd64
+          tags: php-verify:dev
+      - name: Verify dev
+        run: python3 tests/verify.py php-verify:dev dev
       - name: Build ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
           push: false
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: ssh
+          load: true
+          platforms: linux/amd64
+          tags: php-verify:ssh
+      - name: Verify ssh
+        run: python3 tests/verify.py php-verify:ssh ssh
       - name: Build nginx image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
           push: false
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: with-nginx
+          load: true
+          platforms: linux/amd64
+          tags: php-verify:with-nginx
+      - name: Verify with-nginx
+        run: python3 tests/verify.py php-verify:with-nginx with-nginx
       - name: Build nginx with ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
           push: false
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: with-nginx-ssh
+          load: true
+          platforms: linux/amd64
+          tags: php-verify:with-nginx-ssh
+      - name: Verify with-nginx-ssh
+        run: python3 tests/verify.py php-verify:with-nginx-ssh with-nginx-ssh
 
   release:
     name: Release
     runs-on: ubuntu-latest
     needs: [build]
-    if: ${{ github.event_name == 'push' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false

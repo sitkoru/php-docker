@@ -9,9 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: [7.4.33, 8.0.29, 8.1.20, 8.2.7]
+        include:
+          - {version: 7.4.33, debian: bullseye}
+          - {version: 8.0.30, debian: bullseye}
+          - {version: 8.1.34, debian: bookworm}
+          - {version: 8.2.35, debian: bookworm}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v7.0.1
       - name: Prepare
         id: prep
         run: |
@@ -28,7 +32,7 @@ jobs:
             TAGS_DEV="${DOCKER_IMAGE}:${VERSION}-dev,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-dev"
             TAGS_SSH="${DOCKER_IMAGE}:${VERSION}-ssh,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-ssh"
             TAGS_NGINX="${DOCKER_IMAGE}:${VERSION}-nginx,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx"
-            TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-nginx,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx"
+            TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-nginx-ssh,${DOCKER_IMAGE}:${MAJOR}.${MINOR}-nginx-ssh"
           else
             TAGS="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}"
             TAGS_DEV="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-dev"
@@ -36,22 +40,22 @@ jobs:
             TAGS_NGINX="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-nginx"
             TAGS_NGINX_SSH="${DOCKER_IMAGE}:${VERSION}-${{ github.run_id }}-nginx-ssh"
           fi
-          echo ::set-output name=tags::${TAGS}
-          echo ::set-output name=tags_dev::${TAGS_DEV}
-          echo ::set-output name=tags_ssh::${TAGS_SSH}
-          echo ::set-output name=tags_nginx::${TAGS_NGINX}
-          echo ::set-output name=tags_nginx_ssh::${TAGS_NGINX_SSH}
-          echo ::set-output name=created::$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+          echo "tags=${TAGS}" >> "$GITHUB_OUTPUT"
+          echo "tags_dev=${TAGS_DEV}" >> "$GITHUB_OUTPUT"
+          echo "tags_ssh=${TAGS_SSH}" >> "$GITHUB_OUTPUT"
+          echo "tags_nginx=${TAGS_NGINX}" >> "$GITHUB_OUTPUT"
+          echo "tags_nginx_ssh=${TAGS_NGINX_SSH}" >> "$GITHUB_OUTPUT"
+          echo "created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v4.4.1
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v4.6.0
         with:
           registry: ghcr.io
           username: ${{ secrets.BOT_NAME }}
           password: ${{ secrets.BOT_TOKEN }}
       - name: Build fpm image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -59,6 +63,7 @@ jobs:
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: fpm
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -70,7 +75,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build dev image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -78,6 +83,7 @@ jobs:
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: dev
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -89,7 +95,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -97,6 +103,7 @@ jobs:
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -108,7 +115,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -116,6 +123,7 @@ jobs:
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.version }}
+            DEBIAN_VERSION=${{ matrix.debian }}
           target: with-nginx
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -127,7 +135,7 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
       - name: Build nginx with ssh image
-        uses: docker/build-push-action@v4
+        uses: docker/build-push-action@v7.4.0
         with:
           context: .
           file: ./Dockerfile
@@ -135,7 +143,8 @@ jobs:
           push: true
           build-args: |
             PHP_VERSION=${{ matrix.version }}
-          target: with-nginx
+            DEBIAN_VERSION=${{ matrix.debian }}
+          target: with-nginx-ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
             org.opencontainers.image.description=${{ github.event.repository.description }}
