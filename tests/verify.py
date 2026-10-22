@@ -13,6 +13,8 @@ name = 'php-verify-' + uuid.uuid4().hex[:12]
 def docker(*args, **kwargs):
     if args[0] == 'run':
         args = (args[0], '--memory=256m', '--pids-limit=64', *args[1:])
+        if '-p' not in args:
+            args = (args[0], '--network=none', *args[1:])
     return subprocess.run(['docker', *args], check=True, text=True, timeout=60, **kwargs)
 
 def record(kind, data):
