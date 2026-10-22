@@ -10,10 +10,10 @@ jobs:
     strategy:
       matrix:
         include:
-          - {version: 7.4.33, debian: bullseye}
-          - {version: 8.0.30, debian: bullseye}
-          - {version: 8.1.34, debian: bookworm}
-          - {version: 8.2.35, debian: bookworm}
+          - {version: 7.4.33, branch: "7.4"}
+          - {version: 8.0.30, branch: "8.0"}
+          - {version: 8.1.34, branch: "8.1"}
+          - {version: 8.2.35, branch: "8.2"}
     steps:
       - uses: actions/checkout@v7.0.1
       - name: Prepare
@@ -58,12 +58,9 @@ jobs:
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            DEBIAN_VERSION=${{ matrix.debian }}
           target: fpm
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -78,12 +75,9 @@ jobs:
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_dev }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            DEBIAN_VERSION=${{ matrix.debian }}
           target: dev
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -98,12 +92,9 @@ jobs:
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_ssh }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            DEBIAN_VERSION=${{ matrix.debian }}
           target: ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -118,12 +109,9 @@ jobs:
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_nginx }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            DEBIAN_VERSION=${{ matrix.debian }}
           target: with-nginx
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -138,12 +126,9 @@ jobs:
         uses: docker/build-push-action@v7.4.0
         with:
           context: .
-          file: ./Dockerfile
+          file: versions/${{ matrix.branch }}/Dockerfile
           tags: ${{ steps.prep.outputs.tags_nginx_ssh }}
           push: true
-          build-args: |
-            PHP_VERSION=${{ matrix.version }}
-            DEBIAN_VERSION=${{ matrix.debian }}
           target: with-nginx-ssh
           labels: |
             org.opencontainers.image.title=${{ github.event.repository.name }}
@@ -154,3 +139,42 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.licenses=${{ github.event.repository.license.spdx_id }}
+
+
+  legacy:
+    name: Publish PHP 5.6 consumer tags
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - {target: fpm, image: ghcr.io/sitkoru/php5}
+          - {target: dev, image: ghcr.io/sitkoru/php5-dev}
+          - {target: with-nginx, image: ghcr.io/sitkoru/php}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Preserve PHP 5.6 consumer tags
+        id: prep
+        env:
+          IMAGE: ${{ matrix.image }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if [ "$TARGET" = with-nginx ]; then
+            tags="$IMAGE:5.6-nginx,$IMAGE:5.6.40-nginx"
+          else
+            tags="$IMAGE:latest,$IMAGE:sha-${GITHUB_SHA::8}"
+          fi
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4.4.1
+      - uses: docker/login-action@v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ secrets.BOT_NAME }}
+          password: ${{ secrets.BOT_TOKEN }}
+      - uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: versions/5.6/Dockerfile
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.prep.outputs.tags }}
