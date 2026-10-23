@@ -10,6 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
+          - {version: 7.2.34, branch: "7.2"}
           - {version: 7.4.33, branch: "7.4"}
           - {version: 8.0.30, branch: "8.0"}
           - {version: 8.1.34, branch: "8.1"}
