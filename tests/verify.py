@@ -33,6 +33,9 @@ def record(kind, data):
 modules = 'bcmath exif gd gmp grpc intl memcache memcached mongodb mysqli pcntl pdo_mysql pdo_pgsql pgsql redis soap sodium xsl zip'.split() + ['Zend OPcache']
 if target == 'dev':
     modules += ['xdebug', 'ast']
+version = docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;', capture_output=True).stdout
+if version == '7.2':
+    modules = [module for module in modules if module not in ('grpc', 'mongodb')] + ['ftp']
 actual = docker('run', '--rm', image, 'php', '-m', capture_output=True).stdout.splitlines()
 assert set(modules) <= set(actual), set(modules) - set(actual)
 docker('run', '--rm', image, 'php-fpm', '-t')
@@ -41,7 +44,7 @@ if target in ('ssh', 'with-nginx-ssh'):
 if target.startswith('with-nginx'):
     docker('run', '--rm', image, 'nginx', '-t')
 # EOL backport меняет OOM-семантику; поддерживаемая 8.2 использует другое исправление.
-if docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;', capture_output=True).stdout != '8.2':
+if version != '8.2':
     code = open(os.path.join(os.path.dirname(__file__), 'oom.php')).read().replace('<?php', '', 1)
     oom = docker('run', '--rm', image, 'php', '-d', 'memory_limit=16M', '-r', code, check=False, capture_output=True, timeout=30)
     assert oom.returncode == 1, oom

@@ -17,6 +17,7 @@ jobs:
     strategy:
       matrix:
         include:
+          - {version: 7.2.34, branch: "7.2"}
           - {version: 7.4.33, branch: "7.4"}
           - {version: 8.0.30, branch: "8.0"}
           - {version: 8.1.34, branch: "8.1"}
@@ -37,6 +38,15 @@ jobs:
           tags: php-verify:fpm
       - name: Verify fpm
         run: python3 tests/verify.py php-verify:fpm fpm
+      - name: Check PHP 7.2 multipart and session PHPT
+        if: matrix.branch == '7.2'
+        uses: docker/build-push-action@v7.4.0
+        with:
+          context: .
+          file: versions/7.2/Dockerfile
+          push: false
+          target: regression
+          platforms: linux/amd64
       - name: Build dev image
         uses: docker/build-push-action@v7.4.0
         with:
