@@ -1,28 +1,32 @@
-FROM php:8.2.35-fpm-bookworm AS upstream
+FROM php:8.2.36-fpm-bookworm AS upstream
 
 FROM upstream AS build
 
 ENV LANG=C.UTF-8
 
-RUN apt update && apt upgrade -y && apt install -y gnupg
+RUN apt update && apt upgrade -y && apt install -y gnupg patch
 
 COPY scripts/install-extensions.sh /install.sh
 COPY scripts/download-pecl.sh scripts/pecl-sha256.txt /
 
+COPY versions/8.2/patches/0067-soap-dtd.patch /soap-dtd.patch
 RUN docker-php-source extract \
+    && patch -d /usr/src/php -p1 --fuzz=0 < /soap-dtd.patch \
+    && tar -cJf /usr/src/php.tar.xz -C /usr/src/php . \
     && TEST_PHP_EXECUTABLE=/usr/local/bin/php REPORT_EXIT_STATUS=1 php /usr/src/php/run-tests.php -q /usr/src/php/tests/basic/001.phpt /usr/src/php/ext/session/tests/session_basic1.phpt
 
 RUN bash /install.sh redis-6.0.2 mongodb-1.20.1 grpc-1.62.0 memcached-3.2.0 memcache-8.2
 
 FROM upstream AS base
 COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /usr/src/php.tar.xz /usr/src/php.tar.xz
 COPY scripts/configure-runtime.sh /configure-runtime.sh
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY opcache.conf /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
 COPY .bashrc /root/.bashrc
 COPY .bashrc /var/www/.bashrc
 COPY micro.json /root/.config/micro/settings.json
-RUN bash /configure-runtime.sh php8.2.35
+RUN bash /configure-runtime.sh php8.2.36
 WORKDIR /var/www
 CMD ["php-fpm"]
 

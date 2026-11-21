@@ -5,6 +5,7 @@ echo '1369a51eee3995d7fbd1c5342e5cc917760e276d561595b6052b21ace2656d1c  php.tar.
 docker-php-source extract
 cd /usr/src/php
 for patch_file in /patches/*.patch; do patch -p1 --fuzz=0 < "$patch_file"; done
+tar -cJf /usr/src/php.tar.xz --exclude=.git -C /usr/src/php .
 export CFLAGS="$PHP_CFLAGS" CPPFLAGS="$PHP_CPPFLAGS" LDFLAGS="$PHP_LDFLAGS"
 gnuArch="$(dpkg-architecture --query DEB_BUILD_GNU_TYPE)"
 debMultiarch="$(dpkg-architecture --query DEB_BUILD_MULTIARCH)"

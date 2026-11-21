@@ -1,6 +1,6 @@
 # Источник исправлений
 
-Все три файла взяты без изменений из [Debian PHP Maintainers](https://salsa.debian.org/php-team/php/-/tree/37a17e9a4ea67d5422411675b8564860dcf4cc22/debian/patches), commit `37a17e9a4ea67d5422411675b8564860dcf4cc22`.
+Три октябрьских патча взяты без изменений из [Debian PHP Maintainers](https://salsa.debian.org/php-team/php/-/tree/37a17e9a4ea67d5422411675b8564860dcf4cc22/debian/patches), commit `37a17e9a4ea67d5422411675b8564860dcf4cc22`.
 
 | Файл | SHA256 |
 | --- | --- |

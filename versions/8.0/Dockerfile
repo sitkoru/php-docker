@@ -3,6 +3,7 @@ FROM php:8.0.30-fpm-bullseye AS upstream
 RUN if [ -f /etc/apt/sources.list ]; then sed -i 's|http://deb.debian.org/debian-security|https://archive.debian.org/debian-security|g' /etc/apt/sources.list; fi
 
 FROM upstream AS build
+COPY versions/8.0/patches/ /patches/
 COPY scripts/rebuild-php.sh /rebuild-php.sh
 RUN bash /rebuild-php.sh 82f8f31b16a035c1b67cc253e79f7cc288f4cc20 534478c973cef6f493605b7af907f639a364912ee92c24598ddae44c3bc72d1c
 
@@ -20,6 +21,7 @@ RUN bash /install.sh redis-6.0.2 mongodb-1.20.1 grpc-1.62.0 memcached-3.2.0 memc
 
 FROM upstream AS base
 COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /usr/src/php.tar.xz /usr/src/php.tar.xz
 COPY scripts/configure-runtime.sh /configure-runtime.sh
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY opcache.conf /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini

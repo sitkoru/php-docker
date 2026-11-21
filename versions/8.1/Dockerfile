@@ -1,6 +1,7 @@
 FROM php:8.1.34-fpm-bookworm AS upstream
 
 FROM upstream AS build
+COPY versions/8.1/patches/ /patches/
 COPY scripts/rebuild-php.sh /rebuild-php.sh
 RUN bash /rebuild-php.sh 1d7dec178a094e6e75b229ce22754045f8c6070a c85ad0fddcbff7f2318617eeaa54d271135463b5bf70a01228447e3ed78de96e
 
@@ -18,6 +19,7 @@ RUN bash /install.sh redis-6.0.2 mongodb-1.20.1 grpc-1.62.0 memcached-3.2.0 memc
 
 FROM upstream AS base
 COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /usr/src/php.tar.xz /usr/src/php.tar.xz
 COPY scripts/configure-runtime.sh /configure-runtime.sh
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY opcache.conf /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini

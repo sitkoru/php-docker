@@ -1,0 +1,15 @@
+diff --git a/ext/soap/php_xml.c b/ext/soap/php_xml.c
+index a692ba8..a4a45d9 100644
+--- a/ext/soap/php_xml.c
++++ b/ext/soap/php_xml.c
+@@ -276,6 +276,10 @@ int attr_is_equal_ex(xmlAttrPtr node, char *name, char *ns)
+ 
+ int node_is_equal_ex(xmlNodePtr node, char *name, char *ns)
+ {
++	/* A DTD node can carry the same name but is not an xmlNode. */
++	if (node->type != XML_ELEMENT_NODE) {
++		return FALSE;
++	}
+ 	if (name == NULL || ((node->name) && strcmp((char*)node->name, name) == 0)) {
+ 		if (ns) {
+ 			xmlNsPtr nsPtr = node_find_ns(node);
