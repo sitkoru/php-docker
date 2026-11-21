@@ -2,7 +2,7 @@
 set -eu
 cd /usr/src/php
 export TEST_PHP_EXECUTABLE=/usr/local/bin/php
-export TEST_PHP_CGI_EXECUTABLE=/usr/src/php/sapi/cgi/php-cgi
+export TEST_PHP_CGI_EXECUTABLE="${TEST_PHP_CGI_EXECUTABLE:-/usr/src/php/sapi/cgi/php-cgi}"
 export REPORT_EXIT_STATUS=1 NO_INTERACTION=1
 status=0
 php run-tests.php -q \

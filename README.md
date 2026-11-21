@@ -2,16 +2,17 @@
 
 Образы для сайтов: PHP 7.2 и 7.4–8.2 имеют `fpm`, `dev`, `ssh`, `with-nginx`,
 `with-nginx-ssh`; PHP 5.6 имеет `fpm`, `dev` и `with-nginx`.
-CI проверяет PHP 5.6.40 / Stretch, 7.2.34 / Buster, 7.4.33 / Bullseye,
+CI проверяет PHP 5.6.40 / Stretch, 7.2.34 / Trixie, 7.4.33 / Bullseye,
 8.0.30 / Bullseye, 8.1.34 / Bookworm и 8.2.35 / Bookworm на `linux/amd64`.
-Набор расширений сохранён; версии PECL закреплены в отдельных Dockerfile, SHA256 архивов — в
-`scripts/pecl-sha256.txt` и Dockerfile PHP 5.6.
-Веткам 7.2 и 7.4–8.2 PostgreSQL и nginx предоставляет подписанный репозиторий Debian.
+Версии расширений, которые устанавливаются из PECL, закреплены в Dockerfile,
+SHA256 архивов — в `scripts/pecl-sha256.txt` и Dockerfile PHP 5.6.
+Для веток 7.2 и 7.4–8.2 системные библиотеки и Nginx устанавливаются из
+подписанного репозитория Debian.
 Для PHP 5.6 nginx собирается отдельно, см. ниже.
 
 ## Структура
 
-`versions/<ветка>/Dockerfile` явно задаёт базовый образ, патч и расширения своей
+`versions/<ветка>/Dockerfile` явно задаёт базовый образ, источник PHP и расширения своей
 ветки; build context всегда корень репозитория. Общие скрипты в `scripts/`
 выполняют одинаковые операции и не выбирают поведение по `PHP_VERSION`.
 Общие конфиги остаются в корне и `nginx/`. Отличающиеся конфиги и entrypoint
@@ -37,9 +38,9 @@ Upstream называет эти изменения минимальной mitig
 обработчиков завершения. Это изменение поведения нужно учитывать приложениям.
 PHP 8.2.35 используется из официального образа без локального патча.
 
-PHP 5.6/7.2/7.4/8.0/8.1 и Debian Stretch/Buster/Bullseye завершили поддержку.
-Перенос двух исправлений не означает наличия всех исправлений после EOL,
-полноценной поддержки или проверки совместимости сайтов.
+PHP 5.6/7.2/7.4/8.0/8.1 завершили поддержку в проекте PHP. PHP 7.2
+получает исправления из пакетов Surý. Для остальных старых веток
+репозиторий переносит перечисленные исправления.
 Bullseye security доступен через архив; проверка подписей APT сохранена.
 
 ## Проверка без публикации
@@ -117,25 +118,27 @@ access/error в `docker logs`. Приложения сайтов и внешни
 
 ## PHP 7.2
 
-PHP 7.2.34 сохраняет официальный Buster, исходные параметры сборки и прежний
-набор расширений, включая `ftp`, `memcache`, `memcached`, `redis`; `grpc` и
-`mongodb` не добавлены. Отличающиеся параметры GD вынесены в скрипт версии.
-Подписанные репозитории Buster перенесены в Debian archive.
+Образы используют Debian 13 Trixie и готовые пакеты из подписанного
+[репозитория Surý](https://packages.sury.org/php/dists/trixie/).
+Версия PHP-FPM и CLI закреплена в `versions/7.2/Dockerfile`. Расширения
+устанавливаются пакетами для PHP 7.2. Вариант `dev` добавляет пакетные
+Xdebug и AST, а варианты с Nginx используют пакет Debian.
 
-Четыре закреплённых Debian backport-патча и их зависимости описаны в
-[versions/7.2/patches/README.md](versions/7.2/patches/README.md).
-Они дают ту же минимальную mitigation CVE-2026-109618/CVE-2026-109619,
-что PHP 7.4: немедленное завершение при OOM, отключение session upload
-progress и ограничение multipart. Это не полная поддержка EOL-версии.
+PHP-FPM слушает порт 9000. Действующие пути для монтирования конфигурации
+остаются `/usr/local/etc/php-fpm.conf`, `/usr/local/etc/php/php.ini`
+и `/usr/local/etc/php/conf.d`. Пакетные расширения загружаются из каталогов
+`/etc/php/7.2/<SAPI>/conf.d`, затем читаются дополнительные настройки образа.
+PHP CLI включает `pcntl`, PHP-FPM использует пакетный набор модулей.
+Значение `PHP_VERSION` включает ревизию пакета. Для числа версии языка
+можно использовать `PHP_VERSION_ID`.
 
 ```sh
-docker build --platform linux/amd64 -f versions/7.2/Dockerfile --target fpm -t php72-local:fpm .
-python3 tests/verify.py php72-local:fpm fpm
+docker build --platform linux/amd64 -f versions/7.2/Dockerfile --target fpm -t php72-package:fpm .
+python3 tests/verify.py php72-package:fpm fpm
 docker build --platform linux/amd64 -f versions/7.2/Dockerfile --target regression .
 ```
 
-`regression` переиспользует четыре upstream PHPT multipart/session и собственный
-PHPT отключения upload progress с успешной обычной загрузкой из `versions/5.6/tests`.
-Upstream-патч 7.2 не добавляет PHPT; эти четыре теста проверяют сохранение
-обычного поведения, а не эксплуатацию CVE. `tests/verify.py` отдельно проверяет
-OOM без пользовательского обработчика завершения, CLI, расширения и FastCGI.
+Цель `regression` запускает проверки multipart и сессий готовым
+`php7.2-cgi`. Архив PHP используется для `run-tests.php` и тестовых данных.
+`tests/verify.py` проверяет пакетную базу, CLI, модули и ответ PHP-FPM
+на запрос FastCGI.
