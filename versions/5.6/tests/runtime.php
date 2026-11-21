@@ -1,5 +1,5 @@
 <?php
-if (PHP_VERSION !== '5.6.40') { throw new Exception('Unexpected PHP version'); }
+if (PHP_VERSION_ID !== 50640) { throw new Exception('Unexpected PHP version'); }
 $required = array('bcmath', 'gd', 'intl', 'memcache', 'memcached', 'mysql', 'mysqli', 'pcntl', 'pdo_mysql', 'pdo_pgsql', 'pgsql', 'redis', 'soap', 'xsl', 'zip', 'Zend OPcache', 'curl', 'mbstring', 'openssl', 'session', 'PDO', 'Core', 'ctype', 'date', 'dom', 'ereg', 'fileinfo', 'filter', 'ftp', 'hash', 'iconv', 'json', 'libxml', 'mhash', 'mysqlnd', 'pcre', 'pdo_sqlite', 'Phar', 'posix', 'readline', 'Reflection', 'SimpleXML', 'SPL', 'sqlite3', 'standard', 'tokenizer', 'xml', 'xmlreader', 'xmlwriter', 'zlib');
 foreach ($required as $module) {
     if (!extension_loaded($module)) { throw new Exception('Missing extension: ' . $module); }

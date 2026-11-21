@@ -33,12 +33,26 @@ def record(kind, data):
 modules = 'bcmath exif gd gmp grpc intl memcache memcached mongodb mysqli pcntl pdo_mysql pdo_pgsql pgsql redis soap sodium xsl zip'.split() + ['Zend OPcache']
 if target == 'dev':
     modules += ['xdebug', 'ast']
+    docker('run', '--rm', image, 'php', '-r', 'exit(php_ini_loaded_file() !== false);')
+    fpm_info = docker('run', '--rm', image, 'php-fpm', '-i', capture_output=True).stdout
+    assert 'Loaded Configuration File => (none)' in fpm_info
 version = docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;', capture_output=True).stdout
 if version == '7.2':
     modules = [module for module in modules if module not in ('grpc', 'mongodb')] + ['ftp']
+docker('run', '--rm', image, 'sh', '-ec', '''
+    . /etc/os-release
+    test "$VERSION_CODENAME" = trixie
+    dpkg-query -W -f='${Version}' "php$1-fpm" | grep -Fq +debsuryorg13.
+    for tool in cc make phpize "phpize$1"; do
+        if command -v "$tool" >/dev/null; then
+            echo "Unexpected build tool: $tool" >&2
+            exit 1
+        fi
+    done
+''', 'sh', version)
 actual = docker('run', '--rm', image, 'php', '-m', capture_output=True).stdout.splitlines()
 assert set(modules) <= set(actual), set(modules) - set(actual)
-docker('run', '--rm', image, 'php-fpm', '-t')
+docker('run', '--rm', image, '-t')
 if target in ('ssh', 'with-nginx-ssh'):
     docker('run', '--rm', image, 'sh', '-c', 'command -v sshd && command -v rsync')
 if target.startswith('with-nginx'):
@@ -56,23 +70,21 @@ try:
     port = int(docker('port', name, '9000', capture_output=True).stdout.strip().rsplit(':', 1)[1])
     params = {'SCRIPT_FILENAME': '/tmp/health.php', 'REQUEST_METHOD': 'GET', 'SERVER_PROTOCOL': 'HTTP/1.1', 'GATEWAY_INTERFACE': 'CGI/1.1'}
     payload = b''.join(bytes([len(k), len(v)]) + k.encode() + v.encode() for k, v in params.items())
+    response = b''
     for attempt in range(20):
         try:
-            sock = socket.create_connection(('127.0.0.1', port), timeout=3)
-            break
-        except OSError:
-            if attempt == 19:
+            with socket.create_connection(('127.0.0.1', port), timeout=3) as sock:
+                sock.sendall(record(1, struct.pack('!HB5x', 1, 0)) + record(4, payload) + record(4, b'') + record(5, b''))
+                while chunk := sock.recv(65536):
+                    response += chunk
+        except (ConnectionRefusedError, ConnectionResetError, BrokenPipeError):
+            if response or attempt == 19:
                 raise
-            time.sleep(.25)
-    with sock:
-        sock.sendall(record(1, struct.pack('!HB5x', 1, 0)) + record(4, payload) + record(4, b'') + record(5, b''))
-        response = b''
-        while True:
-            chunk = sock.recv(65536)
-            if not chunk:
-                break
-            response += chunk
-        assert b'FPM_OK' in response, response
+        # Docker может открыть порт на хосте раньше, чем FPM начнёт отвечать.
+        if response:
+            break
+        time.sleep(.25)
+    assert b'FPM_OK' in response, response
 finally:
     docker('rm', '-f', name)
 print(f'PASS: {image}: CLI, modules, FPM request, target tools')
