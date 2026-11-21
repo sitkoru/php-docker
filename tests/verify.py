@@ -33,23 +33,26 @@ def record(kind, data):
 modules = 'bcmath exif gd gmp grpc intl memcache memcached mongodb mysqli pcntl pdo_mysql pdo_pgsql pgsql redis soap sodium xsl zip'.split() + ['Zend OPcache']
 if target == 'dev':
     modules += ['xdebug', 'ast']
+    docker('run', '--rm', image, 'php', '-r', 'exit(php_ini_loaded_file() !== false);')
+    fpm_info = docker('run', '--rm', image, 'php-fpm', '-i', capture_output=True).stdout
+    assert 'Loaded Configuration File => (none)' in fpm_info
 version = docker('run', '--rm', image, 'php', '-r', 'echo PHP_MAJOR_VERSION,".",PHP_MINOR_VERSION;', capture_output=True).stdout
 if version == '7.2':
     modules = [module for module in modules if module not in ('grpc', 'mongodb')] + ['ftp']
-    docker('run', '--rm', image, 'sh', '-ec', '''
-        . /etc/os-release
-        test "$VERSION_CODENAME" = trixie
-        dpkg-query -W -f='${Version}' php7.2-fpm | grep -Eq '^7[.]2[.]34-.*[+]debsuryorg13[.]'
-        for tool in cc make phpize phpize7.2; do
-            if command -v "$tool" >/dev/null; then
-                echo "Unexpected build tool: $tool" >&2
-                exit 1
-            fi
-        done
-    ''')
+docker('run', '--rm', image, 'sh', '-ec', '''
+    . /etc/os-release
+    test "$VERSION_CODENAME" = trixie
+    dpkg-query -W -f='${Version}' "php$1-fpm" | grep -Fq +debsuryorg13.
+    for tool in cc make phpize "phpize$1"; do
+        if command -v "$tool" >/dev/null; then
+            echo "Unexpected build tool: $tool" >&2
+            exit 1
+        fi
+    done
+''', 'sh', version)
 actual = docker('run', '--rm', image, 'php', '-m', capture_output=True).stdout.splitlines()
 assert set(modules) <= set(actual), set(modules) - set(actual)
-docker('run', '--rm', image, 'php-fpm', '-t')
+docker('run', '--rm', image, '-t')
 if target in ('ssh', 'with-nginx-ssh'):
     docker('run', '--rm', image, 'sh', '-c', 'command -v sshd && command -v rsync')
 if target.startswith('with-nginx'):
