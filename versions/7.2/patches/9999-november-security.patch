@@ -1,0 +1,2151 @@
+--- a/ext/dom/document.c
++++ b/ext/dom/document.c
+@@ -1438,6 +1438,7 @@
+ 		options |= XML_PARSE_NOBLANKS;
+ 	}
+ 
++	php_libxml_sanitize_parse_ctxt_options(ctxt);
+ 	xmlCtxtUseOptions(ctxt, options);
+ 
+ 	ctxt->recovery = recover;
+@@ -1735,7 +1736,9 @@
+ 
+ 	DOM_GET_OBJ(docp, id, xmlDocPtr, intern);
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(xinclude);
+ 	err = xmlXIncludeProcessFlags(docp, (int)flags);
++	PHP_LIBXML_RESTORE_GLOBALS(xinclude);
+ 
+ 	/* XML_XINCLUDE_START and XML_XINCLUDE_END nodes need to be removed as these
+ 	are added via xmlXIncludeProcess to mark beginning and ending of xincluded document
+@@ -1774,6 +1777,7 @@
+ 
+ 	DOM_GET_OBJ(docp, id, xmlDocPtr, intern);
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(validate);
+ 	cvp = xmlNewValidCtxt();
+ 
+ 	cvp->userData = NULL;
+@@ -1785,6 +1789,7 @@
+ 	} else {
+ 		RETVAL_FALSE;
+ 	}
++	PHP_LIBXML_RESTORE_GLOBALS(validate);
+ 
+ 	xmlFreeValidCtxt(cvp);
+ 
+@@ -1818,14 +1823,18 @@
+ 
+ 	DOM_GET_OBJ(docp, id, xmlDocPtr, intern);
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(new_parser_ctxt);
++
+ 	switch (type) {
+ 	case DOM_LOAD_FILE:
+ 		if (CHECK_NULL_PATH(source, source_len)) {
++			PHP_LIBXML_RESTORE_GLOBALS(new_parser_ctxt);
+ 			php_error_docref(NULL, E_WARNING, "Invalid Schema file source");
+ 			RETURN_FALSE;
+ 		}
+ 		valid_file = _dom_get_valid_file_path(source, resolved_path, MAXPATHLEN);
+ 		if (!valid_file) {
++			PHP_LIBXML_RESTORE_GLOBALS(new_parser_ctxt);
+ 			php_error_docref(NULL, E_WARNING, "Invalid Schema file source");
+ 			RETURN_FALSE;
+ 		}
+@@ -1846,6 +1855,7 @@
+ 		parser);
+ 	sptr = xmlSchemaParse(parser);
+ 	xmlSchemaFreeParserCtxt(parser);
++	PHP_LIBXML_RESTORE_GLOBALS(new_parser_ctxt);
+ 	if (!sptr) {
+ 		php_error_docref(NULL, E_WARNING, "Invalid Schema");
+ 		RETURN_FALSE;
+@@ -1866,11 +1876,13 @@
+ 	}
+ #endif
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(validate);
+ 	xmlSchemaSetValidOptions(vptr, valid_opts);
+ 	xmlSchemaSetValidErrors(vptr, php_libxml_error_handler, php_libxml_error_handler, vptr);
+ 	is_valid = xmlSchemaValidateDoc(vptr, docp);
+ 	xmlSchemaFree(sptr);
+ 	xmlSchemaFreeValidCtxt(vptr);
++	PHP_LIBXML_RESTORE_GLOBALS(validate);
+ 
+ 	if (is_valid == 0) {
+ 		RETURN_TRUE;
+@@ -1940,12 +1952,14 @@
+ 		return;
+ 	}
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(parse);
+ 	xmlRelaxNGSetParserErrors(parser,
+ 		(xmlRelaxNGValidityErrorFunc) php_libxml_error_handler,
+ 		(xmlRelaxNGValidityWarningFunc) php_libxml_error_handler,
+ 		parser);
+ 	sptr = xmlRelaxNGParse(parser);
+ 	xmlRelaxNGFreeParserCtxt(parser);
++	PHP_LIBXML_RESTORE_GLOBALS(parse);
+ 	if (!sptr) {
+ 		php_error_docref(NULL, E_WARNING, "Invalid RelaxNG");
+ 		RETURN_FALSE;
+@@ -2045,6 +2059,7 @@
+ 		ctxt->sax->error = php_libxml_ctx_error;
+ 		ctxt->sax->warning = php_libxml_ctx_warning;
+ 	}
++	php_libxml_sanitize_parse_ctxt_options(ctxt);
+ 	if (options) {
+ 		htmlCtxtUseOptions(ctxt, (int)options);
+ 	}
+--- a/ext/dom/documentfragment.c
++++ b/ext/dom/documentfragment.c
+@@ -134,7 +134,9 @@
+ 	}
+ 
+ 	if (data) {
++		PHP_LIBXML_SANITIZE_GLOBALS(parse);
+ 		err = xmlParseBalancedChunkMemory(nodep->doc, NULL, NULL, 0, (xmlChar *) data, &lst);
++		PHP_LIBXML_RESTORE_GLOBALS(parse);
+ 		if (err != 0) {
+ 			RETURN_FALSE;
+ 		}
+--- a/ext/libxml/php_libxml.h
++++ b/ext/libxml/php_libxml.h
+@@ -122,6 +122,42 @@
+ ZEND_TSRMLS_CACHE_EXTERN()
+ #endif
+ 
++/* Other extension may override the global state options, these global options
++ * are copied initially to ctxt->options. Set the options to a known good value.
++ * See libxml2 globals.c and parserInternals.c.
++ * The unique_name argument allows multiple sanitizes and restores within the
++ * same function, even nested is necessary. */
++#define PHP_LIBXML_SANITIZE_GLOBALS(unique_name) \
++	int xml_old_loadsubset_##unique_name = xmlLoadExtDtdDefaultValue; \
++	xmlLoadExtDtdDefaultValue = 0; \
++	int xml_old_validate_##unique_name = xmlDoValidityCheckingDefaultValue; \
++	xmlDoValidityCheckingDefaultValue = 0; \
++	int xml_old_pedantic_##unique_name = xmlPedanticParserDefault(0); \
++	int xml_old_substitute_##unique_name = xmlSubstituteEntitiesDefault(0); \
++	int xml_old_linenrs_##unique_name = xmlLineNumbersDefault(0); \
++	int xml_old_blanks_##unique_name = xmlKeepBlanksDefault(1);
++
++#define PHP_LIBXML_RESTORE_GLOBALS(unique_name) \
++	xmlLoadExtDtdDefaultValue = xml_old_loadsubset_##unique_name; \
++	xmlDoValidityCheckingDefaultValue = xml_old_validate_##unique_name; \
++	(void) xmlPedanticParserDefault(xml_old_pedantic_##unique_name); \
++	(void) xmlSubstituteEntitiesDefault(xml_old_substitute_##unique_name); \
++	(void) xmlLineNumbersDefault(xml_old_linenrs_##unique_name); \
++	(void) xmlKeepBlanksDefault(xml_old_blanks_##unique_name);
++
++/* Alternative for above, working directly on the context and not setting globals.
++ * Generally faster because no locking is involved, and this has the advantage that it sets the options to a known good value. */
++static zend_always_inline void php_libxml_sanitize_parse_ctxt_options(xmlParserCtxtPtr ctxt)
++{
++	ctxt->loadsubset = 0;
++	ctxt->validate = 0;
++	ctxt->pedantic = 0;
++	ctxt->replaceEntities = 0;
++	ctxt->linenumbers = 0;
++	ctxt->keepBlanks = 1;
++	ctxt->options = 0;
++}
++
+ #else /* HAVE_LIBXML */
+ #define libxml_module_ptr NULL
+ #endif
+--- a/ext/phar/util.c
++++ b/ext/phar/util.c
+@@ -1481,6 +1481,23 @@
+ 
+ 	php_stream_rewind(fp);
+ 
++	if (sig_type != PHAR_SIG_OPENSSL) {
++		php_stream_statbuf ssb;
++		char *pfile;
++		zend_bool has_pubkey;
++
++		spprintf(&pfile, 0, "%s.pubkey", fname);
++		has_pubkey = php_stream_stat_path_ex(pfile, PHP_STREAM_URL_STAT_QUIET, &ssb, NULL) == 0;
++		efree(pfile);
++
++		if (has_pubkey) {
++			if (error) {
++				spprintf(error, 0, "openssl public key found, but the signature does not use openssl");
++			}
++			return FAILURE;
++		}
++	}
++
+ 	switch (sig_type) {
+ 		case PHAR_SIG_OPENSSL: {
+ #ifdef PHAR_HAVE_OPENSSL
+--- a/ext/session/mod_files.c
++++ b/ext/session/mod_files.c
+@@ -240,9 +240,9 @@
+ 		return FAILURE;
+ 	}
+ 
+-	/* Truncate file if the amount of new data is smaller than the existing data set. */
+-	if (ZSTR_LEN(val) < data->st_size) {
+-		php_ignore_value(ftruncate(data->fd, 0));
++	if (ftruncate(data->fd, 0) != 0) {
++		php_error_docref(NULL, E_WARNING, "ftruncate() failed: %s (%d)", strerror(errno), errno);
++		return FAILURE;
+ 	}
+ 
+ #if defined(HAVE_PWRITE)
+--- a/ext/session/session.c
++++ b/ext/session/session.c
+@@ -816,7 +816,7 @@
+ 
+ 	/* Upload progress */
+ 	STD_PHP_INI_BOOLEAN("session.upload_progress.enabled",
+-	                                                "1",     ZEND_INI_PERDIR, OnUpdateBool,        rfc1867_enabled, php_ps_globals, ps_globals)
++	                                                "0",     ZEND_INI_PERDIR, OnUpdateBool,        rfc1867_enabled, php_ps_globals, ps_globals)
+ 	STD_PHP_INI_BOOLEAN("session.upload_progress.cleanup",
+ 	                                                "1",     ZEND_INI_PERDIR, OnUpdateBool,        rfc1867_cleanup, php_ps_globals, ps_globals)
+ 	STD_PHP_INI_ENTRY("session.upload_progress.prefix",
+@@ -2826,6 +2826,7 @@
+ 	ps_globals->mod = NULL;
+ 	ps_globals->serializer = NULL;
+ 	ps_globals->mod_data = NULL;
++	ps_globals->rfc1867_enabled = 0;
+ 	ps_globals->session_status = php_session_none;
+ 	ps_globals->default_mod = NULL;
+ 	ps_globals->mod_user_implemented = 0;
+--- a/ext/simplexml/simplexml.c
++++ b/ext/simplexml/simplexml.c
+@@ -2217,7 +2217,9 @@
+ 		RETURN_FALSE;
+ 	}
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(read_file);
+ 	docp = xmlReadFile(filename, NULL, (int)options);
++	PHP_LIBXML_RESTORE_GLOBALS(read_file);
+ 
+ 	if (!docp) {
+ 		RETURN_FALSE;
+@@ -2271,7 +2273,9 @@
+ 		RETURN_FALSE;
+ 	}
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(read_memory);
+ 	docp = xmlReadMemory(data, (int)data_len, NULL, NULL, (int)options);
++	PHP_LIBXML_RESTORE_GLOBALS(read_memory);
+ 
+ 	if (!docp) {
+ 		RETURN_FALSE;
+@@ -2321,7 +2325,9 @@
+ 		return;
+ 	}
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(read_file_or_memory);
+ 	docp = is_url ? xmlReadFile(data, NULL, (int)options) : xmlReadMemory(data, (int)data_len, NULL, NULL, (int)options);
++	PHP_LIBXML_RESTORE_GLOBALS(read_file_or_memory);
+ 
+ 	if (!docp) {
+ 		((php_libxml_node_object *)sxe)->document = NULL;
+--- a/ext/soap/php_encoding.c
++++ b/ext/soap/php_encoding.c
+@@ -559,7 +559,12 @@
+ 		}
+ 	}
+ 	if (encode->to_zval) {
++		if (SOAP_GLOBAL(decode_depth) >= SOAP_MAX_DECODE_DEPTH) {
++			soap_error0(E_ERROR, "Encoding: Nesting level too deep");
++		}
++		SOAP_GLOBAL(decode_depth)++;
+ 		ret = encode->to_zval(ret, &encode->details, data);
++		SOAP_GLOBAL(decode_depth)--;
+ 	}
+ 	return ret;
+ }
+@@ -2032,7 +2037,7 @@
+ 		}
+ 		str++;
+ 	}
+-	return i;
++	return i != 0 ? i : 1;
+ }
+ 
+ static int* get_position_12(int dimension, const char* str)
+@@ -3451,6 +3456,7 @@
+ {
+ 	SOAP_GLOBAL(cur_uniq_ns) = 0;
+ 	SOAP_GLOBAL(cur_uniq_ref) = 0;
++	SOAP_GLOBAL(decode_depth) = 0;
+ 	if (SOAP_GLOBAL(ref_map)) {
+ 		zend_hash_destroy(SOAP_GLOBAL(ref_map));
+ 	} else {
+@@ -3463,6 +3469,7 @@
+ {
+ 	SOAP_GLOBAL(cur_uniq_ns) = 0;
+ 	SOAP_GLOBAL(cur_uniq_ref) = 0;
++	SOAP_GLOBAL(decode_depth) = 0;
+ 	if (SOAP_GLOBAL(ref_map)) {
+ 		zend_hash_destroy(SOAP_GLOBAL(ref_map));
+ 		efree(SOAP_GLOBAL(ref_map));
+--- a/ext/soap/php_sdl.c
++++ b/ext/soap/php_sdl.c
+@@ -314,6 +314,8 @@
+ 	ctx->context = NULL;
+ }
+ 
++#define SAFE_STR(a) ((a)?a:"")
++
+ static void load_wsdl_ex(zval *this_ptr, char *struri, sdlCtx *ctx, int include)
+ {
+ 	sdlPtr tmpsdl = ctx->sdl;
+@@ -375,7 +377,7 @@
+ 				if (node_is_equal_ex(trav2, "schema", XSD_NAMESPACE)) {
+ 					load_schema(ctx, trav2);
+ 				} else if (is_wsdl_element(trav2) && !node_is_equal(trav2,"documentation")) {
+-					soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav2->name);
++					soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", SAFE_STR(trav2->name));
+ 				}
+ 				trav2 = trav2->next;
+ 			}
+@@ -436,7 +438,7 @@
+ 				soap_error0(E_ERROR, "Parsing WSDL: <service> has no name attribute");
+ 			}
+ 		} else if (!node_is_equal(trav,"documentation")) {
+-			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 		}
+ 		trav = trav->next;
+ 	}
+@@ -546,7 +548,7 @@
+ 				}
+ 				smart_str_free(&key);
+ 			} else if (is_wsdl_element(trav) && !node_is_equal(trav,"documentation")) {
+-				soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++				soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 			}
+ 			trav = trav->next;
+ 		}
+@@ -648,7 +650,7 @@
+ 			}
+ 			smart_str_free(&key);
+ 		} else if (is_wsdl_element(trav) && !node_is_equal(trav,"documentation")) {
+-			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 		}
+ 		trav = trav->next;
+ 	}
+@@ -680,14 +682,14 @@
+ 		sdlParamPtr param;
+ 
+ 		if (trav->ns != NULL && strcmp((char*)trav->ns->href, WSDL_NAMESPACE) != 0) {
+-			soap_error1(E_ERROR, "Parsing WSDL: Unexpected extensibility element <%s>", trav->name);
++			soap_error1(E_ERROR, "Parsing WSDL: Unexpected extensibility element <%s>",  SAFE_STR(trav->name));
+ 		}
+ 		if (node_is_equal(trav,"documentation")) {
+ 			trav = trav->next;
+ 			continue;
+ 		}
+ 		if (!node_is_equal(trav,"part")) {
+-			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++			soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 		}
+ 		part = trav;
+ 		param = emalloc(sizeof(sdlParam));
+@@ -696,7 +698,7 @@
+ 
+ 		name = get_attribute(part->properties, "name");
+ 		if (name == NULL) {
+-			soap_error1(E_ERROR, "Parsing WSDL: No name associated with <part> '%s'", message->name);
++			soap_error1(E_ERROR, "Parsing WSDL: No name associated with <part> '%s'",  SAFE_STR(message->name));
+ 		}
+ 
+ 		param->paramName = estrdup((char*)name->children->content);
+@@ -765,7 +767,7 @@
+ 					continue;
+ 				}
+ 				if (!node_is_equal(trav,"port")) {
+-					soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++					soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 				}
+ 
+ 				port = trav;
+@@ -804,7 +806,7 @@
+ 						}
+ 					}
+ 					if (trav2 != address && is_wsdl_element(trav2) && !node_is_equal(trav2,"documentation")) {
+-						soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav2->name);
++						soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav2->name));
+ 					}
+ 				  trav2 = trav2->next;
+ 				}
+@@ -906,7 +908,7 @@
+ 						continue;
+ 					}
+ 					if (!node_is_equal(trav2,"operation")) {
+-						soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav2->name);
++						soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav2->name));
+ 					}
+ 
+ 					operation = trav2;
+@@ -925,7 +927,7 @@
+ 						           !node_is_equal(trav3,"output") &&
+ 						           !node_is_equal(trav3,"fault") &&
+ 						           !node_is_equal(trav3,"documentation")) {
+-							soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav3->name);
++							soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav3->name));
+ 						}
+ 						trav3 = trav3->next;
+ 					}
+@@ -1103,7 +1105,7 @@
+ 												}
+ 											}
+ 										} else if (is_wsdl_element(trav) && !node_is_equal(trav,"documentation")) {
+-											soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>", trav->name);
++											soap_error1(E_ERROR, "Parsing WSDL: Unexpected WSDL element <%s>",  SAFE_STR(trav->name));
+ 										}
+ 										trav = trav->next;
+ 									}
+--- a/ext/soap/php_soap.h
++++ b/ext/soap/php_soap.h
+@@ -153,6 +153,8 @@
+ #define SOAP_SSL_METHOD_SSLv3   2
+ #define SOAP_SSL_METHOD_SSLv23  3
+ 
++#define SOAP_MAX_XML_DEPTH 2048
++#define SOAP_MAX_DECODE_DEPTH (SOAP_MAX_XML_DEPTH * 2)
+ 
+ ZEND_BEGIN_MODULE_GLOBALS(soap)
+ 	HashTable  defEncNs;     /* mapping of default namespaces to prefixes */
+@@ -178,6 +180,7 @@
+ 	HashTable  wsdl_cache;
+ 	int        cur_uniq_ref;
+ 	HashTable *ref_map;
++	unsigned int decode_depth;
+ ZEND_END_MODULE_GLOBALS(soap)
+ 
+ #ifdef ZTS
+--- a/ext/soap/php_xml.c
++++ b/ext/soap/php_xml.c
+@@ -38,36 +38,75 @@
+ 	return 1;
+ }
+ 
+-/* removes all empty text, comments and other insignoficant nodes */
++/* removes all empty text, comments and other insignoficant nodes.
++ * Iterative because recursion overflows the stack on a deep document. */
+ static void cleanup_xml_node(xmlNodePtr node)
+ {
+-	xmlNodePtr trav;
+-	xmlNodePtr del = NULL;
+-
+-	trav = node->children;
++	xmlNodePtr parent = node;
++	xmlNodePtr trav = node->children;
++
+ 	while (trav != NULL) {
+-		if (del != NULL) {
+-			xmlUnlinkNode(del);
+-			xmlFreeNode(del);
+-			del = NULL;
+-		}
++		xmlNodePtr next = trav->next;
++
+ 		if (trav->type == XML_TEXT_NODE) {
+ 			if (is_blank(trav->content)) {
+-				del = trav;
+-			}
++				xmlUnlinkNode(trav);
++				xmlFreeNode(trav);
++			}
++		} else if (trav->type == XML_DTD_NODE) {
++			/* Attribute-value entity references can share content with the DTD.
++			 * Keep it alive until the document itself is freed. */
+ 		} else if ((trav->type != XML_ELEMENT_NODE) &&
+ 		           (trav->type != XML_CDATA_SECTION_NODE)) {
+-			del = trav;
++			xmlUnlinkNode(trav);
++			xmlFreeNode(trav);
+ 		} else if (trav->children != NULL) {
+-			cleanup_xml_node(trav);
++			parent = trav;
++			trav = trav->children;
++			continue;
++		}
++
++		while (next == NULL) {
++			if (parent == node) {
++				return;
++			}
++			next = parent->next;
++			parent = parent->parent;
++		}
++		trav = next;
++	}
++}
++
++#if LIBXML_VERSION < 21300
++static int is_nesting_too_deep(xmlNodePtr node)
++{
++	xmlNodePtr trav = node->children;
++	unsigned int depth = 0;
++
++	while (trav != NULL) {
++		/* An entity reference borrows its declaration as child list, and that
++		 * declaration hangs off the DTD, so descending leaves the document. */
++		if (trav->children != NULL &&
++		    trav->type != XML_ENTITY_REF_NODE &&
++		    trav->type != XML_DTD_NODE) {
++			if (++depth > SOAP_MAX_XML_DEPTH) {
++				return TRUE;
++			}
++			trav = trav->children;
++			continue;
++		}
++		while (trav->next == NULL) {
++			trav = trav->parent;
++			if (trav == node) {
++				return FALSE;
++			}
++			depth--;
+ 		}
+ 		trav = trav->next;
+ 	}
+-	if (del != NULL) {
+-		xmlUnlinkNode(del);
+-		xmlFreeNode(del);
+-	}
+-}
++	return FALSE;
++}
++#endif
+ 
+ static void soap_ignorableWhitespace(void *ctx, const xmlChar *ch, int len)
+ {
+@@ -94,6 +133,7 @@
+ 	if (ctxt) {
+ 		zend_bool old;
+ 
++		php_libxml_sanitize_parse_ctxt_options(ctxt);
+ 		ctxt->keepBlanks = 0;
+ 		ctxt->sax->ignorableWhitespace = soap_ignorableWhitespace;
+ 		ctxt->sax->comment = soap_Comment;
+@@ -126,6 +166,15 @@
+ */
+ 
+ 	if (ret) {
++#if LIBXML_VERSION < 21300
++		if (is_nesting_too_deep((xmlNodePtr)ret)) {
++			/* php_sdl.c reports xmlGetLastError() as the reason, and libxml2 did
++			 * not fail here, so drop the error an earlier parse left behind. */
++			xmlResetLastError();
++			xmlFreeDoc(ret);
++			return NULL;
++		}
++#endif
+ 		cleanup_xml_node((xmlNodePtr)ret);
+ 	}
+ 	return ret;
+@@ -144,6 +193,7 @@
+ 	if (ctxt) {
+ 		zend_bool old;
+ 
++		php_libxml_sanitize_parse_ctxt_options(ctxt);
+ 		ctxt->sax->ignorableWhitespace = soap_ignorableWhitespace;
+ 		ctxt->sax->comment = soap_Comment;
+ 		ctxt->sax->warning = NULL;
+@@ -174,6 +224,13 @@
+ 	xmlCleanupParser();
+ */
+ 
++#if LIBXML_VERSION < 21300
++	if (ret && is_nesting_too_deep((xmlNodePtr)ret)) {
++		xmlFreeDoc(ret);
++		ret = NULL;
++	}
++#endif
++
+ /*
+ 	if (ret) {
+ 		cleanup_xml_node((xmlNodePtr)ret);
+@@ -204,7 +261,7 @@
+ 
+ int attr_is_equal_ex(xmlAttrPtr node, char *name, char *ns)
+ {
+-	if (name == NULL || strcmp((char*)node->name, name) == 0) {
++	if (name == NULL || ((node->name) && strcmp((char*)node->name, name) == 0)) {
+ 		if (ns) {
+ 			xmlNsPtr nsPtr = attr_find_ns(node);
+ 			if (nsPtr) {
+@@ -220,7 +277,11 @@
+ 
+ int node_is_equal_ex(xmlNodePtr node, char *name, char *ns)
+ {
+-	if (name == NULL || strcmp((char*)node->name, name) == 0) {
++	/* A DTD node can carry the same name but is not an xmlNode. */
++	if (node->type != XML_ELEMENT_NODE) {
++		return FALSE;
++	}
++	if (name == NULL || ((node->name) && strcmp((char*)node->name, name) == 0)) {
+ 		if (ns) {
+ 			xmlNsPtr nsPtr = node_find_ns(node);
+ 			if (nsPtr) {
+@@ -296,6 +357,8 @@
+ 
+ xmlNodePtr get_node_with_attribute_recursive_ex(xmlNodePtr node, char *name, char *name_ns, char *attribute, char *value, char *attr_ns)
+ {
++	unsigned int depth = 0;
++
+ 	while (node != NULL) {
+ 		if (node_is_equal_ex(node, name, name_ns)) {
+ 			xmlAttrPtr attr = get_attribute_ex(node->properties, attribute, attr_ns);
+@@ -303,11 +366,19 @@
+ 				return node;
+ 			}
+ 		}
+-		if (node->children != NULL) {
+-			xmlNodePtr tmp = get_node_with_attribute_recursive_ex(node->children, name, name_ns, attribute, value, attr_ns);
+-			if (tmp) {
+-				return tmp;
+-			}
++		if (node->children != NULL &&
++		    node->type != XML_ENTITY_REF_NODE &&
++		    node->type != XML_DTD_NODE) {
++			node = node->children;
++			depth++;
++			continue;
++		}
++		while (node->next == NULL) {
++			if (depth == 0) {
++				return NULL;
++			}
++			node = node->parent;
++			depth--;
+ 		}
+ 		node = node->next;
+ 	}
+--- a/ext/soap/soap.c
++++ b/ext/soap/soap.c
+@@ -579,6 +579,7 @@
+ 	soap_globals->soap_version = SOAP_1_1;
+ 	soap_globals->mem_cache = NULL;
+ 	soap_globals->ref_map = NULL;
++	soap_globals->decode_depth = 0;
+ }
+ 
+ PHP_MSHUTDOWN_FUNCTION(soap)
+--- a/ext/standard/ftp_fopen_wrapper.c
++++ b/ext/standard/ftp_fopen_wrapper.c
+@@ -148,7 +148,7 @@
+ 		return NULL;
+ 	}
+ 
+-	use_ssl = resource->scheme && (strlen(resource->scheme) > 3) && resource->scheme[3] == 's';
++	use_ssl = resource->scheme && !strcasecmp(resource->scheme, "ftps");
+ 
+ 	/* use port 21 if one wasn't specified */
+ 	if (resource->port == 0)
+--- a/ext/standard/http_fopen_wrapper.c
++++ b/ext/standard/http_fopen_wrapper.c
+@@ -70,41 +70,288 @@
+ 
+ #include "php_fopen_wrappers.h"
+ 
+-#define HTTP_HEADER_BLOCK_SIZE		1024
+-#define PHP_URL_REDIRECT_MAX		20
+-#define HTTP_HEADER_USER_AGENT		1
+-#define HTTP_HEADER_HOST			2
+-#define HTTP_HEADER_AUTH			4
+-#define HTTP_HEADER_FROM			8
+-#define HTTP_HEADER_CONTENT_LENGTH	16
+-#define HTTP_HEADER_TYPE			32
+-#define HTTP_HEADER_CONNECTION		64
++#define HTTP_HEADER_BLOCK_SIZE			1024
++#define HTTP_HEADER_MAX_LOCATION_SIZE	8182 /* 8192 - 10 (size of "Location: ") */
++#define PHP_URL_REDIRECT_MAX			20
++#define HTTP_HEADER_USER_AGENT			1
++#define HTTP_HEADER_HOST				2
++#define HTTP_HEADER_AUTH				4
++#define HTTP_HEADER_FROM				8
++#define HTTP_HEADER_CONTENT_LENGTH		16
++#define HTTP_HEADER_TYPE				32
++#define HTTP_HEADER_CONNECTION			64
+ 
+ #define HTTP_WRAPPER_HEADER_INIT    1
+ #define HTTP_WRAPPER_REDIRECTED     2
+-
++#define HTTP_WRAPPER_STRIP_AUTH     8
++
++static char *next_header_line(char *line)
++{
++	while (*line != '\0' && *line != '\r' && *line != '\n') {
++		line++;
++	}
++	if (*line == '\r') {
++		line++;
++	}
++	if (*line == '\n') {
++		line++;
++	}
++
++	return line;
++}
++
++/* Removes every line whose header name matches, along with the folded
++ * continuation lines carrying the rest of its value. Neither a repeated header
++ * nor an occurrence of the name inside another header's value may leave the real
++ * header behind, as that would defeat HTTP_WRAPPER_STRIP_AUTH. */
+ static inline void strip_header(char *header_bag, char *lc_header_bag,
+ 		const char *lc_header_name)
+ {
+-	char *lc_header_start = strstr(lc_header_bag, lc_header_name);
+-	char *header_start = header_bag + (lc_header_start - lc_header_bag);
+-
+-	if (lc_header_start
+-	&& (lc_header_start == lc_header_bag || *(lc_header_start-1) == '\n')
++	size_t name_len = strlen(lc_header_name);
++	char *lc_line = lc_header_bag;
++
++	while (*lc_line != '\0') {
++		if (strncmp(lc_line, lc_header_name, name_len) != 0) {
++			lc_line = next_header_line(lc_line);
++			continue;
++		}
++
++		/* the whitespace RFC 7230 forbids before the colon is tolerated by some
++		 * servers, so it must not hide the header from us either */
++		const char *lc_colon = lc_line + name_len;
++		while (*lc_colon == ' ' || *lc_colon == '\t') {
++			lc_colon++;
++		}
++
++		if (*lc_colon != ':') {
++			lc_line = next_header_line(lc_line);
++			continue;
++		}
++
++		char *lc_next = next_header_line(lc_line);
++		while (*lc_next == ' ' || *lc_next == '\t') {
++			lc_next = next_header_line(lc_next);
++		}
++
++		if (*lc_next == '\0') {
++			/* drop the preceding line break too, or the one appended after the bag
++			 * would close the header block early */
++			while (lc_line > lc_header_bag
++					&& (*(lc_line - 1) == '\r' || *(lc_line - 1) == '\n')) {
++				--lc_line;
++			}
++		}
++
++		size_t tail_len = strlen(lc_next) + 1;
++		char *line = header_bag + (lc_line - lc_header_bag);
++
++		memmove(line, header_bag + (lc_next - lc_header_bag), tail_len);
++		memmove(lc_line, lc_next, tail_len);
++	}
++}
++
++static zend_bool check_has_header(const char *headers, const char *header) {
++	const char *s = headers;
++	while ((s = strstr(s, header))) {
++		if (s == headers || (*(s-1) == '\n' && *(s-2) == '\r')) {
++			return 1;
++		}
++		s++;
++	}
++	return 0;
++}
++
++typedef struct _php_stream_http_response_header_info {
++	php_stream_filter *transfer_encoding;
++	size_t file_size;
++	zend_bool error;
++	zend_bool follow_location;
++	char *location;
++	size_t location_len;
++} php_stream_http_response_header_info;
++
++static void php_stream_http_response_header_info_init(
++		php_stream_http_response_header_info *header_info)
++{
++	memset(header_info, 0, sizeof(php_stream_http_response_header_info));
++	header_info->follow_location = 1;
++}
++
++/* Trim white spaces from response header line and update its length */
++static zend_bool php_stream_http_response_header_trim(char *http_header_line,
++		size_t *http_header_line_length)
++{
++	char *http_header_line_end = http_header_line + *http_header_line_length - 1;
++	while (http_header_line_end >= http_header_line && 
++			(*http_header_line_end == '\n' || *http_header_line_end == '\r')) {
++		http_header_line_end--;
++	}
++
++	/* The primary definition of an HTTP header in RFC 7230 states:
++	* > Each header field consists of a case-insensitive field name followed
++	* > by a colon (":"), optional leading whitespace, the field value, and
++	* > optional trailing whitespace. */
++
++	/* Strip trailing whitespace */
++	zend_bool space_trim = (*http_header_line_end == ' ' || *http_header_line_end == '\t');
++	if (space_trim) {
++		do {
++			http_header_line_end--;
++		} while (http_header_line_end >= http_header_line &&
++				(*http_header_line_end == ' ' || *http_header_line_end == '\t'));
++	}
++	http_header_line_end++;
++	*http_header_line_end = '\0';
++	*http_header_line_length = http_header_line_end - http_header_line;
++
++	return space_trim;
++}
++
++/* Process folding headers of the current line and if there are none, parse last full response
++ * header line. It returns true if the current line was folded into the last header line,
++ * otherwise false.  */
++static zend_bool php_stream_http_response_headers_parse(php_stream_wrapper *wrapper,
++		php_stream *stream, php_stream_context *context, int options,
++		smart_str *last_header, char *header_line, size_t *header_line_length,
++		int response_code, zval *response_header,
++		php_stream_http_response_header_info *header_info)
++{
++	/* Process non empty header line. */
++	if (header_line && (*header_line != '\n' && *header_line != '\r')) {
++		/* Removing trailing white spaces. */
++		if (php_stream_http_response_header_trim(header_line, header_line_length) &&
++				*header_line_length == 0) {
++			/* Only spaces so treat as an empty folding header. */
++			return 1;
++		}
++
++		/* Process folding headers if starting with a space or a tab. */
++		if (header_line && (*header_line == ' ' || *header_line == '\t')) {
++			char *http_folded_header_line = header_line;
++			size_t http_folded_header_line_length = *header_line_length;
++			/* Remove the leading white spaces. */
++			while (*http_folded_header_line == ' ' || *http_folded_header_line == '\t') {
++				http_folded_header_line++;
++				http_folded_header_line_length--;
++			}
++			/* It has to have some characters because it would get returned after the call
++			 * php_stream_http_response_header_trim above. */
++			ZEND_ASSERT(http_folded_header_line_length > 0);
++			/* Append space and current header line to the last header line. */
++			smart_str_appendc(last_header, ' ');
++			smart_str_appendl(last_header, http_folded_header_line, http_folded_header_line_length);
++			return 1;
++		}
++	}
++
++	zend_string *last_header_line_str = smart_str_extract(last_header);
++	char *last_header_line = ZSTR_VAL(last_header_line_str);
++	size_t last_header_line_length = ZSTR_LEN(last_header_line_str);
++	char *last_header_line_end = ZSTR_VAL(last_header_line_str) + ZSTR_LEN(last_header_line_str) - 1;
++
++	/* Find header separator position. */
++	char *last_header_value = memchr(last_header_line, ':', last_header_line_length);
++	if (last_header_value) {
++		/* Verify there is no space in header name */
++		char *last_header_name = last_header_line + 1;
++		while (last_header_name < last_header_value) {
++			if (*last_header_name == ' ' || *last_header_name == '\t') {
++				header_info->error = 1;
++				php_stream_wrapper_log_error(wrapper, options,
++					"HTTP invalid response format (space in header name)!");
++				zend_string_efree(last_header_line_str);
++				return 0;
++			}
++			++last_header_name;
++		}
++
++		last_header_value++; /* Skip ':'. */
++
++		/* Strip leading whitespace. */
++		while (last_header_value < last_header_line_end
++				&& (*last_header_value == ' ' || *last_header_value == '\t')) {
++			last_header_value++;
++		}
++	} else {
++		/* There is no colon which means invalid response so error. */
++		header_info->error = 1;
++		php_stream_wrapper_log_error(wrapper, options,
++				"HTTP invalid response format (no colon in header line)!");
++		zend_string_efree(last_header_line_str);
++		return 0;
++	}
++
++	zend_bool store_header = 1;
++	zval *tmpzval = NULL;
++
++	if (!strncasecmp(last_header_line, "Location:", sizeof("Location:")-1)) {
++		/* Check if the location should be followed. */
++		if (context && (tmpzval = php_stream_context_get_option(context, "http", "follow_location")) != NULL) {
++			header_info->follow_location = zval_is_true(tmpzval);
++		} else if (!((response_code >= 300 && response_code < 304)
++				|| 307 == response_code || 308 == response_code)) {
++			/* The redirection should not be automatic if follow_location is not set and
++			 * response_code not in (300, 301, 302, 303 and 307)
++			 * see http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.1
++			 * RFC 7238 defines 308: http://tools.ietf.org/html/rfc7238 */
++			header_info->follow_location = 0;
++		}
++		size_t last_header_value_len = strlen(last_header_value);
++		if (last_header_value_len > HTTP_HEADER_MAX_LOCATION_SIZE) {
++			header_info->error = 1;
++			php_stream_wrapper_log_error(wrapper, options,
++					"HTTP Location header size is over the limit of %d bytes",
++					HTTP_HEADER_MAX_LOCATION_SIZE);
++			zend_string_efree(last_header_line_str);
++			return 0;
++		}
++		if (header_info->location_len == 0) {
++			header_info->location = emalloc(last_header_value_len + 1);
++		} else if (header_info->location_len <= last_header_value_len) {
++			header_info->location = erealloc(header_info->location, last_header_value_len + 1);
++		}
++		header_info->location_len = last_header_value_len;
++		memcpy(header_info->location, last_header_value, last_header_value_len + 1);
++	} else if (!strncasecmp(last_header_line, "Content-Type:", sizeof("Content-Type:")-1)) {
++		php_stream_notify_info(context, PHP_STREAM_NOTIFY_MIME_TYPE_IS, last_header_value, 0);
++	} else if (!strncasecmp(last_header_line, "Content-Length:", sizeof("Content-Length:")-1)) {
++		header_info->file_size = atoi(last_header_value);
++		php_stream_notify_file_size(context, header_info->file_size, last_header_line, 0);
++	} else if (
++		!strncasecmp(last_header_line, "Transfer-Encoding:", sizeof("Transfer-Encoding:")-1)
++		&& !strncasecmp(last_header_value, "Chunked", sizeof("Chunked")-1)
+ 	) {
+-		char *lc_eol = strchr(lc_header_start, '\n');
+-		char *eol = header_start + (lc_eol - lc_header_start);
+-
+-		if (lc_eol) {
+-			size_t eollen = strlen(lc_eol);
+-
+-			memmove(lc_header_start, lc_eol+1, eollen);
+-			memmove(header_start, eol+1, eollen);
+-		} else {
+-			*lc_header_start = '\0';
+-			*header_start = '\0';
+-		}
+-	}
++		/* Create filter to decode response body. */
++		if (!(options & STREAM_ONLY_GET_HEADERS)) {
++			zend_long decode = 1;
++
++			if (context && (tmpzval = php_stream_context_get_option(context, "http", "auto_decode")) != NULL) {
++				decode = zend_is_true(tmpzval);
++			}
++			if (decode) {
++				if (header_info->transfer_encoding != NULL) {
++					/* Prevent a memory leak in case there are more transfer-encoding headers. */
++					php_stream_filter_free(header_info->transfer_encoding);
++				}
++				header_info->transfer_encoding = php_stream_filter_create(
++						"dechunk", NULL, php_stream_is_persistent(stream));
++				if (header_info->transfer_encoding != NULL) {
++					/* Do not store transfer-encoding header. */
++					store_header = 0;
++				}
++			}
++		}
++	}
++
++	if (store_header) {
++		zval http_header;
++		ZVAL_NEW_STR(&http_header, last_header_line_str);
++		zend_hash_next_index_insert(Z_ARRVAL_P(response_header), &http_header);
++	} else {
++		zend_string_efree(last_header_line_str);
++	}
++
++	return 0;
+ }
+ 
+ static php_stream *php_stream_url_wrap_http_ex(php_stream_wrapper *wrapper,
+@@ -119,11 +366,12 @@
+ 	zend_string *tmp = NULL;
+ 	char *ua_str = NULL;
+ 	zval *ua_zval = NULL, *tmpzval = NULL, ssl_proxy_peer_name;
+-	char location[HTTP_HEADER_BLOCK_SIZE];
+ 	int reqok = 0;
+ 	char *http_header_line = NULL;
++	smart_str last_header = {0};
++	php_stream_http_response_header_info header_info;
+ 	char tmp_line[128];
+-	size_t chunk_size = 0, file_size = 0;
++	size_t chunk_size = 0;
+ 	int eol_detect = 0;
+ 	char *transport_string;
+ 	zend_string *errstr = NULL;
+@@ -134,8 +382,6 @@
+ 	char *user_headers = NULL;
+ 	int header_init = ((flags & HTTP_WRAPPER_HEADER_INIT) != 0);
+ 	int redirected = ((flags & HTTP_WRAPPER_REDIRECTED) != 0);
+-	zend_bool follow_location = 1;
+-	php_stream_filter *transfer_encoding = NULL;
+ 	int response_code;
+ 	smart_str req_buf = {0};
+ 	zend_bool custom_request_method;
+@@ -176,7 +422,12 @@
+ 			return NULL;
+ 		}
+ 
+-		use_ssl = resource->scheme && (strlen(resource->scheme) > 4) && resource->scheme[4] == 's';
++		/* Should we send the entire path in the request line, default to no. */
++		if (context && (tmpzval = php_stream_context_get_option(context, "http", "request_fulluri")) != NULL) {
++			request_fulluri = zend_is_true(tmpzval);
++		}
++
++		use_ssl = resource->scheme && !strcasecmp(resource->scheme, "https");
+ 		/* choose default ports */
+ 		if (use_ssl && resource->port == 0)
+ 			resource->port = 443;
+@@ -193,6 +444,13 @@
+ 		} else {
+ 			transport_len = spprintf(&transport_string, 0, "%s://%s:%d", use_ssl ? "ssl" : "tcp", resource->host, resource->port);
+ 		}
++	}
++
++	if (request_fulluri && (strchr(path, '\n') != NULL || strchr(path, '\r') != NULL)) {
++		php_stream_wrapper_log_error(wrapper, options, "HTTP wrapper full URI path does not allow CR or LF characters");
++		php_url_free(resource);
++		efree(transport_string);
++		return NULL;
+ 	}
+ 
+ 	if (context && (tmpzval = php_stream_context_get_option(context, wrapper->wops->label, "timeout")) != NULL) {
+@@ -335,6 +593,8 @@
+ 		}
+ 	}
+ 
++	php_stream_http_response_header_info_init(&header_info);
++
+ 	if (stream == NULL)
+ 		goto out;
+ 
+@@ -375,12 +635,6 @@
+ 		smart_str_appends(&req_buf, "GET ");
+ 	}
+ 
+-	/* Should we send the entire path in the request line, default to no. */
+-	if (!request_fulluri && context &&
+-		(tmpzval = php_stream_context_get_option(context, "http", "request_fulluri")) != NULL) {
+-		request_fulluri = zend_is_true(tmpzval);
+-	}
+-
+ 	if (request_fulluri) {
+ 		/* Ask for everything */
+ 		smart_str_appends(&req_buf, path);
+@@ -456,49 +710,50 @@
+ 
+ 			if (!header_init) {
+ 				/* strip POST headers on redirect */
+-				strip_header(user_headers, t, "content-length:");
+-				strip_header(user_headers, t, "content-type:");
+-			}
+-
+-			if ((s = strstr(t, "user-agent:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_USER_AGENT;
+-			}
+-			if ((s = strstr(t, "host:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_HOST;
+-			}
+-			if ((s = strstr(t, "from:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_FROM;
+-				}
+-			if ((s = strstr(t, "authorization:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_AUTH;
+-			}
+-			if ((s = strstr(t, "content-length:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_CONTENT_LENGTH;
+-			}
+-			if ((s = strstr(t, "content-type:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_TYPE;
+-			}
+-			if ((s = strstr(t, "connection:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
+-				 have_header |= HTTP_HEADER_CONNECTION;
+-			}
++				strip_header(user_headers, t, "content-length");
++				strip_header(user_headers, t, "content-type");
++			}
++
++			if (flags & HTTP_WRAPPER_STRIP_AUTH) {
++				strip_header(user_headers, t, "authorization");
++				strip_header(user_headers, t, "cookie");
++				if (!use_proxy) {
++					strip_header(user_headers, t, "proxy-authorization");
++				}
++			}
++
++			if (*user_headers == '\0') {
++				/* everything got stripped, keeping the empty bag would append a
++				 * stray CRLF and end the header block early */
++				efree(user_headers);
++				user_headers = NULL;
++			}
++
++			if (check_has_header(t, "user-agent:")) {
++				have_header |= HTTP_HEADER_USER_AGENT;
++			}
++			if (check_has_header(t, "host:")) {
++				have_header |= HTTP_HEADER_HOST;
++			}
++			if (check_has_header(t, "from:")) {
++				have_header |= HTTP_HEADER_FROM;
++			}
++			if (check_has_header(t, "authorization:")) {
++				have_header |= HTTP_HEADER_AUTH;
++			}
++			if (check_has_header(t, "content-length:")) {
++				have_header |= HTTP_HEADER_CONTENT_LENGTH;
++			}
++			if (check_has_header(t, "content-type:")) {
++				have_header |= HTTP_HEADER_TYPE;
++			}
++			if (check_has_header(t, "connection:")) {
++				have_header |= HTTP_HEADER_CONNECTION;
++			}
++
+ 			/* remove Proxy-Authorization header */
+ 			if (use_proxy && use_ssl && (s = strstr(t, "proxy-authorization:")) &&
+-			    (s == t || *(s-1) == '\r' || *(s-1) == '\n' ||
+-			                 *(s-1) == '\t' || *(s-1) == ' ')) {
++			    (s == t || *(s-1) == '\n')) {
+ 				char *p = s + sizeof("proxy-authorization:") - 1;
+ 
+ 				while (s > t && (*(s-1) == ' ' || *(s-1) == '\t')) s--;
+@@ -654,8 +909,6 @@
+ 
+ 	/* send it */
+ 	php_stream_write(stream, ZSTR_VAL(req_buf.s), ZSTR_LEN(req_buf.s));
+-
+-	location[0] = '\0';
+ 
+ 	if (Z_ISUNDEF_P(response_header)) {
+ 		array_init(response_header);
+@@ -738,132 +991,103 @@
+ 	}
+ 
+ 	/* read past HTTP headers */
+-
+-	http_header_line = emalloc(HTTP_HEADER_BLOCK_SIZE);
+-
+ 	while (!php_stream_eof(stream)) {
+ 		size_t http_header_line_length;
+ 
+-		if (php_stream_get_line(stream, http_header_line, HTTP_HEADER_BLOCK_SIZE, &http_header_line_length) && *http_header_line != '\n' && *http_header_line != '\r') {
+-			char *e = http_header_line + http_header_line_length - 1;
+-			char *http_header_value;
+-			if (*e != '\n') {
+-				do { /* partial header */
+-					if (php_stream_get_line(stream, http_header_line, HTTP_HEADER_BLOCK_SIZE, &http_header_line_length) == NULL) {
+-						php_stream_wrapper_log_error(wrapper, options, "Failed to read HTTP headers");
++		if (http_header_line != NULL) {
++			efree(http_header_line);
++		}
++		if ((http_header_line = php_stream_get_line(stream, NULL, 0, &http_header_line_length))) {
++			zend_bool last_line;
++			if (*http_header_line == '\r') {
++				if (http_header_line[1] != '\n') {
++					php_stream_close(stream);
++					stream = NULL;
++					php_stream_wrapper_log_error(wrapper, options,
++							"HTTP invalid header name (cannot start with CR character)!");
++					goto out;
++				}
++				last_line = 1;
++			} else if (*http_header_line == '\n') {
++				last_line = 1;
++			} else {
++				last_line = 0;
++			}
++			
++			if (last_header.s != NULL) {
++				/* Parse last header line. */
++				zend_bool folded = php_stream_http_response_headers_parse(wrapper, stream,
++						context, options, &last_header, http_header_line,
++						&http_header_line_length, response_code, response_header, &header_info);
++				if (EXPECTED(!folded)) {
++					if (UNEXPECTED(header_info.error)) {
++						php_stream_close(stream);
++						stream = NULL;
+ 						goto out;
+ 					}
+-					e = http_header_line + http_header_line_length - 1;
+-				} while (*e != '\n');
+-				continue;
+-			}
+-			while (e >= http_header_line && (*e == '\n' || *e == '\r')) {
+-				e--;
+-			}
+-
+-			/* The primary definition of an HTTP header in RFC 7230 states:
+-			 * > Each header field consists of a case-insensitive field name followed
+-			 * > by a colon (":"), optional leading whitespace, the field value, and
+-			 * > optional trailing whitespace. */
+-
+-			/* Strip trailing whitespace */
+-			while (e >= http_header_line && (*e == ' ' || *e == '\t')) {
+-				e--;
+-			}
+-
+-			/* Terminate header line */
+-			e++;
+-			*e = '\0';
+-			http_header_line_length = e - http_header_line;
+-
+-			http_header_value = memchr(http_header_line, ':', http_header_line_length);
+-			if (http_header_value) {
+-				http_header_value++; /* Skip ':' */
+-
+-				/* Strip leading whitespace */
+-				while (http_header_value < e
+-						&& (*http_header_value == ' ' || *http_header_value == '\t')) {
+-					http_header_value++;
+-				}
+-			} else {
+-				/* There is no colon. Set the value to the end of the header line, which is
+-				 * effectively an empty string. */
+-				http_header_value = e;
+-			}
+-
+-			if (!strncasecmp(http_header_line, "Location:", sizeof("Location:")-1)) {
+-				if (context && (tmpzval = php_stream_context_get_option(context, "http", "follow_location")) != NULL) {
+-					follow_location = zval_is_true(tmpzval);
+-				} else if (!((response_code >= 300 && response_code < 304)
+-						|| 307 == response_code || 308 == response_code)) {
+-					/* we shouldn't redirect automatically
+-					if follow_location isn't set and response_code not in (300, 301, 302, 303 and 307)
+-					see http://www.w3.org/Protocols/rfc2616/rfc2616-sec10.html#sec10.3.1
+-					RFC 7238 defines 308: http://tools.ietf.org/html/rfc7238 */
+-					follow_location = 0;
+-				}
+-				strlcpy(location, http_header_value, sizeof(location));
+-			} else if (!strncasecmp(http_header_line, "Content-Type:", sizeof("Content-Type:")-1)) {
+-				php_stream_notify_info(context, PHP_STREAM_NOTIFY_MIME_TYPE_IS, http_header_value, 0);
+-			} else if (!strncasecmp(http_header_line, "Content-Length:", sizeof("Content-Length:")-1)) {
+-				file_size = atoi(http_header_value);
+-				php_stream_notify_file_size(context, file_size, http_header_line, 0);
+-			} else if (
+-				!strncasecmp(http_header_line, "Transfer-Encoding:", sizeof("Transfer-Encoding:")-1)
+-				&& !strncasecmp(http_header_value, "Chunked", sizeof("Chunked")-1)
+-			) {
+-
+-				/* create filter to decode response body */
+-				if (!(options & STREAM_ONLY_GET_HEADERS)) {
+-					zend_long decode = 1;
+-
+-					if (context && (tmpzval = php_stream_context_get_option(context, "http", "auto_decode")) != NULL) {
+-						decode = zend_is_true(tmpzval);
+-					}
+-					if (decode) {
+-						transfer_encoding = php_stream_filter_create("dechunk", NULL, php_stream_is_persistent(stream));
+-						if (transfer_encoding) {
+-							/* don't store transfer-encodeing header */
+-							continue;
+-						}
+-					}
+-				}
+-			}
+-
+-			{
+-				zval http_header;
+-				ZVAL_STRINGL(&http_header, http_header_line, http_header_line_length);
+-				zend_hash_next_index_insert(Z_ARRVAL_P(response_header), &http_header);
+-			}
++				} else {
++					/* Folding header present so continue. */
++					continue;
++				}
++			} else if (!last_line) {
++				/* The first line cannot start with spaces. */
++				if (*http_header_line == ' ' || *http_header_line == '\t') {
++					php_stream_close(stream);
++					stream = NULL;
++					php_stream_wrapper_log_error(wrapper, options,
++							"HTTP invalid response format (folding header at the start)!");
++					goto out;
++				}
++				/* Trim the first line if it is not the last line. */
++				php_stream_http_response_header_trim(http_header_line, &http_header_line_length);
++			}
++			if (last_line) {
++				/* For the last line the last header line must be NULL. */
++				ZEND_ASSERT(last_header.s == NULL);
++				break;
++			}
++			/* Save current line as the last line so it gets parsed in the next round. */
++			smart_str_appendl(&last_header, http_header_line, http_header_line_length);
+ 		} else {
+ 			break;
+ 		}
+ 	}
+ 
+-	if (!reqok || (location[0] != '\0' && follow_location)) {
+-		if (!follow_location || (((options & STREAM_ONLY_GET_HEADERS) || ignore_errors) && redirect_max <= 1)) {
++	/* If the stream was closed early, we still want to process the last line to keep BC. */
++	if (last_header.s != NULL) {
++		php_stream_http_response_headers_parse(wrapper, stream, context, options,
++				&last_header, NULL, NULL, response_code, response_header, &header_info);
++	}
++
++	if (!reqok || (header_info.location != NULL && header_info.follow_location)) {
++		if (!header_info.follow_location || (((options & STREAM_ONLY_GET_HEADERS) || ignore_errors) && redirect_max <= 1)) {
+ 			goto out;
+ 		}
+ 
+-		if (location[0] != '\0')
+-			php_stream_notify_info(context, PHP_STREAM_NOTIFY_REDIRECTED, location, 0);
++		if (header_info.location != NULL)
++			php_stream_notify_info(context, PHP_STREAM_NOTIFY_REDIRECTED, header_info.location, 0);
+ 
+ 		php_stream_close(stream);
+ 		stream = NULL;
+ 
+-		if (location[0] != '\0') {
+-
+-			char new_path[HTTP_HEADER_BLOCK_SIZE];
+-			char loc_path[HTTP_HEADER_BLOCK_SIZE];
+-
+-			*new_path='\0';
+-			if (strlen(location)<8 || (strncasecmp(location, "http://", sizeof("http://")-1) &&
+-							strncasecmp(location, "https://", sizeof("https://")-1) &&
+-							strncasecmp(location, "ftp://", sizeof("ftp://")-1) &&
+-							strncasecmp(location, "ftps://", sizeof("ftps://")-1)))
++		if (header_info.transfer_encoding) {
++			php_stream_filter_free(header_info.transfer_encoding);
++			header_info.transfer_encoding = NULL;
++		}
++
++		if (header_info.location != NULL) {
++
++			char *new_path = NULL;
++
++			if (header_info.location_len < 8 ||
++					(strncasecmp(header_info.location, "http://", sizeof("http://")-1) &&
++							strncasecmp(header_info.location, "https://", sizeof("https://")-1) &&
++							strncasecmp(header_info.location, "ftp://", sizeof("ftp://")-1) &&
++							strncasecmp(header_info.location, "ftps://", sizeof("ftps://")-1)))
+ 			{
+-				if (*location != '/') {
+-					if (*(location+1) != '\0' && resource->path) {
++				char *loc_path = NULL;
++				if (*header_info.location != '/') {
++					if (header_info.location_len > 1 && resource->path) {
+ 						char *s = strrchr(resource->path, '/');
+ 						if (!s) {
+ 							s = resource->path;
+@@ -876,31 +1100,45 @@
+ 						}
+ 						s[1] = '\0';
+ 						if (resource->path && *(resource->path) == '/' && *(resource->path + 1) == '\0') {
+-							snprintf(loc_path, sizeof(loc_path) - 1, "%s%s", resource->path, location);
++							spprintf(&loc_path, 0, "%s%s", resource->path, header_info.location);
+ 						} else {
+-							snprintf(loc_path, sizeof(loc_path) - 1, "%s/%s", resource->path, location);
++							spprintf(&loc_path, 0, "%s/%s", resource->path, header_info.location);
+ 						}
+ 					} else {
+-						snprintf(loc_path, sizeof(loc_path) - 1, "/%s", location);
++						spprintf(&loc_path, 0, "/%s", header_info.location);
+ 					}
+ 				} else {
+-					strlcpy(loc_path, location, sizeof(loc_path));
++					loc_path = header_info.location;
++					header_info.location = NULL;
+ 				}
+ 				if ((use_ssl && resource->port != 443) || (!use_ssl && resource->port != 80)) {
+-					snprintf(new_path, sizeof(new_path) - 1, "%s://%s:%d%s", resource->scheme, resource->host, resource->port, loc_path);
++					spprintf(&new_path, 0, "%s://%s:%d%s", resource->scheme, resource->host, resource->port, loc_path);
+ 				} else {
+-					snprintf(new_path, sizeof(new_path) - 1, "%s://%s%s", resource->scheme, resource->host, loc_path);
+-				}
++					spprintf(&new_path, 0, "%s://%s%s", resource->scheme, resource->host, loc_path);
++				}
++				efree(loc_path);
+ 			} else {
+-				strlcpy(new_path, location, sizeof(new_path));
+-			}
++				new_path = header_info.location;
++				header_info.location = NULL;
++			}
++
++			php_url *new_resource = php_url_parse(new_path);
++			if (new_resource == NULL) {
++				php_stream_wrapper_log_error(wrapper, options, "Invalid redirect URL! %s", new_path);
++				efree(new_path);
++				goto out;
++			}
++
++			int default_port = use_ssl ? 443 : 80;
++			zend_bool same_origin = resource->scheme && new_resource->scheme
++				&& !strcasecmp(resource->scheme, new_resource->scheme)
++				&& resource->host && new_resource->host
++				&& !strcasecmp(resource->host, new_resource->host)
++				&& (resource->port ? resource->port : default_port)
++					== (new_resource->port ? new_resource->port : default_port);
+ 
+ 			php_url_free(resource);
+-			/* check for invalid redirection URLs */
+-			if ((resource = php_url_parse(new_path)) == NULL) {
+-				php_stream_wrapper_log_error(wrapper, options, "Invalid redirect URL! %s", new_path);
+-				goto out;
+-			}
++			resource = new_resource;
+ 
+ #define CHECK_FOR_CNTRL_CHARS(val) { \
+ 	if (val) { \
+@@ -911,6 +1149,7 @@
+ 		while (s < e) { \
+ 			if (iscntrl(*s)) { \
+ 				php_stream_wrapper_log_error(wrapper, options, "Invalid redirect URL! %s", new_path); \
++				efree(new_path); \
+ 				goto out; \
+ 			} \
+ 			s++; \
+@@ -923,9 +1162,14 @@
+ 				CHECK_FOR_CNTRL_CHARS(resource->pass)
+ 				CHECK_FOR_CNTRL_CHARS(resource->path)
+ 			}
++			int new_flags = HTTP_WRAPPER_REDIRECTED | (flags & HTTP_WRAPPER_STRIP_AUTH);
++			if (!same_origin) {
++				new_flags |= HTTP_WRAPPER_STRIP_AUTH;
++			}
+ 			stream = php_stream_url_wrap_http_ex(
+ 				wrapper, new_path, mode, options, opened_path, context,
+-				--redirect_max, HTTP_WRAPPER_REDIRECTED, response_header STREAMS_CC);
++				--redirect_max, new_flags, response_header STREAMS_CC);
++			efree(new_path);
+ 		} else {
+ 			php_stream_wrapper_log_error(wrapper, options, "HTTP request failed! %s", tmp_line);
+ 		}
+@@ -933,9 +1177,14 @@
+ out:
+ 
+ 	smart_str_free(&req_buf);
++	smart_str_free(&last_header);
+ 
+ 	if (http_header_line) {
+ 		efree(http_header_line);
++	}
++
++	if (header_info.location != NULL) {
++		efree(header_info.location);
+ 	}
+ 
+ 	if (resource) {
+@@ -946,7 +1195,7 @@
+ 		if (header_init) {
+ 			ZVAL_COPY(&stream->wrapperdata, response_header);
+ 		}
+-		php_stream_notify_progress_init(context, 0, file_size);
++		php_stream_notify_progress_init(context, 0, header_info.file_size);
+ 
+ 		/* Restore original chunk size now that we're done with headers */
+ 		if (options & STREAM_WILL_CAST)
+@@ -962,12 +1211,8 @@
+ 		/* restore mode */
+ 		strlcpy(stream->mode, mode, sizeof(stream->mode));
+ 
+-		if (transfer_encoding) {
+-			php_stream_filter_append(&stream->readfilters, transfer_encoding);
+-		}
+-	} else {
+-		if (transfer_encoding) {
+-			php_stream_filter_free(transfer_encoding);
++		if (header_info.transfer_encoding) {
++			php_stream_filter_append(&stream->readfilters, header_info.transfer_encoding);
+ 		}
+ 	}
+ 
+--- a/ext/xml/compat.c
++++ b/ext/xml/compat.c
+@@ -19,6 +19,7 @@
+ #include "php.h"
+ #if defined(HAVE_LIBXML) && (defined(HAVE_XML) || defined(HAVE_XMLRPC)) && !defined(HAVE_LIBEXPAT)
+ #include "expat_compat.h"
++#include "ext/libxml/php_libxml.h"
+ 
+ typedef struct _php_xml_ns {
+ 	xmlNsPtr nsptr;
+@@ -473,6 +474,7 @@
+ 	parser->parser->charset = XML_CHAR_ENCODING_NONE;
+ #endif
+ 
++	php_libxml_sanitize_parse_ctxt_options(parser->parser);
+ #if LIBXML_VERSION >= 20703
+ 	xmlCtxtUseOptions(parser->parser, XML_PARSE_OLDSAX);
+ #endif
+--- a/ext/xmlreader/php_xmlreader.c
++++ b/ext/xmlreader/php_xmlreader.c
+@@ -301,6 +301,7 @@
+ 		return NULL;
+ 	}
+ 
++	PHP_LIBXML_SANITIZE_GLOBALS(parse);
+ 	if (error_func || warn_func) {
+ 		xmlRelaxNGSetParserErrors(parser,
+ 			(xmlRelaxNGValidityErrorFunc) error_func,
+@@ -309,6 +310,7 @@
+ 	}
+ 	sptr = xmlRelaxNGParse(parser);
+ 	xmlRelaxNGFreeParserCtxt(parser);
++	PHP_LIBXML_RESTORE_GLOBALS(parse);
+ 
+ 	return sptr;
+ }
+@@ -881,7 +883,9 @@
+ 	valid_file = _xmlreader_get_valid_file_path(source, resolved_path, MAXPATHLEN );
+ 
+ 	if (valid_file) {
++		PHP_LIBXML_SANITIZE_GLOBALS(reader_for_file);
+ 		reader = xmlReaderForFile(valid_file, encoding, options);
++		PHP_LIBXML_RESTORE_GLOBALS(reader_for_file);
+ 	}
+ 
+ 	if (reader == NULL) {
+@@ -959,7 +963,9 @@
+ 
+ 	intern = Z_XMLREADER_P(id);
+ 	if (intern && intern->ptr) {
++		PHP_LIBXML_SANITIZE_GLOBALS(schema);
+ 		retval = xmlTextReaderSchemaValidate(intern->ptr, source);
++		PHP_LIBXML_RESTORE_GLOBALS(schema);
+ 
+ 		if (retval == 0) {
+ 			RETURN_TRUE;
+@@ -1079,6 +1085,7 @@
+ 			}
+ 			uri = (char *) xmlCanonicPath((const xmlChar *) resolved_path);
+ 		}
++		PHP_LIBXML_SANITIZE_GLOBALS(text_reader);
+ 		reader = xmlNewTextReader(inputbfr, uri);
+ 
+ 		if (reader != NULL) {
+@@ -1099,9 +1106,11 @@
+ 					xmlFree(uri);
+ 				}
+ 
++				PHP_LIBXML_RESTORE_GLOBALS(text_reader);
+ 				return;
+ 			}
+ 		}
++		PHP_LIBXML_RESTORE_GLOBALS(text_reader);
+ 	}
+ 
+ 	if (uri) {
+--- a/ext/xsl/xsltprocessor.c
++++ b/ext/xsl/xsltprocessor.c
+@@ -396,7 +396,7 @@
+ 	xmlDoc *doc = NULL, *newdoc = NULL;
+ 	xsltStylesheetPtr sheetp, oldsheetp;
+ 	xsl_object *intern;
+-	int prevSubstValue, prevExtDtdValue, clone_docu = 0;
++	int clone_docu = 0;
+ 	xmlNode *nodep = NULL;
+ 	zend_object_handlers *std_hnd;
+ 	zval *cloneDocu, member, rv;
+@@ -419,13 +419,12 @@
+ 	stylesheet document otherwise the node proxies will be a mess */
+ 	newdoc = xmlCopyDoc(doc, 1);
+ 	xmlNodeSetBase((xmlNodePtr) newdoc, (xmlChar *)doc->URL);
+-	prevSubstValue = xmlSubstituteEntitiesDefault(1);
+-	prevExtDtdValue = xmlLoadExtDtdDefaultValue;
++	PHP_LIBXML_SANITIZE_GLOBALS(parse);
++	xmlSubstituteEntitiesDefault(1);
+ 	xmlLoadExtDtdDefaultValue = XML_DETECT_IDS | XML_COMPLETE_ATTRS;
+ 
+ 	sheetp = xsltParseStylesheetDoc(newdoc);
+-	xmlSubstituteEntitiesDefault(prevSubstValue);
+-	xmlLoadExtDtdDefaultValue = prevExtDtdValue;
++	PHP_LIBXML_RESTORE_GLOBALS(parse);
+ 
+ 	if (!sheetp) {
+ 		xmlFreeDoc(newdoc);
+--- a/main/SAPI.c
++++ b/main/SAPI.c
+@@ -502,7 +502,8 @@
+ 	zend_llist_destroy(&SG(sapi_headers).headers);
+ 	if (SG(request_info).request_body) {
+ 		SG(request_info).request_body = NULL;
+-	} else if (SG(server_context)) {
++	}
++	if (SG(server_context)) {
+ 		if (!SG(post_read)) {
+ 			/* make sure we've consumed all request input data */
+ 			char dummy[SAPI_POST_BLOCK_SIZE];
+--- a/main/fastcgi.c
++++ b/main/fastcgi.c
+@@ -1051,6 +1051,10 @@
+ 	int len, padding;
+ 	unsigned char buf[FCGI_MAX_LENGTH+8];
+ 
++	if (UNEXPECTED(req->in_len != 0)) {
++		return 0;
++	}
++
+ 	req->keep = 0;
+ 	req->ended = 0;
+ 	req->in_len = 0;
+@@ -1314,6 +1318,8 @@
+ 		req->nodelay = 0;
+ #endif
+ 		req->fd = -1;
++		/* a partially read STDIN record does not outlive its connection */
++		req->in_len = 0;
+ 
+ 		req->hook.on_close();
+ 	}
+--- a/main/main.c
++++ b/main/main.c
+@@ -696,15 +696,7 @@
+ 			zend_string *error_time_str;
+ 
+ 			time(&error_time);
+-#ifdef ZTS
+-			if (!php_during_module_startup()) {
+-				error_time_str = php_format_date("d-M-Y H:i:s e", 13, error_time, 1);
+-			} else {
+-				error_time_str = php_format_date("d-M-Y H:i:s e", 13, error_time, 0);
+-			}
+-#else
+-			error_time_str = php_format_date("d-M-Y H:i:s e", 13, error_time, 1);
+-#endif
++			error_time_str = php_format_date("d-M-Y H:i:s e", 13, error_time, PG(modules_activated) && EG(active));
+ 			len = spprintf(&tmp, 0, "[%s] %s%s", ZSTR_VAL(error_time_str), log_message, PHP_EOL);
+ #ifdef PHP_WIN32
+ 			php_flock(fd, 2);
+--- a/sapi/cgi/cgi_main.c
++++ b/sapi/cgi/cgi_main.c
+@@ -1302,9 +1302,9 @@
+ 						 */
+ 						size_t slen = len - strlen(pt);
+ 						size_t pilen = env_path_info ? strlen(env_path_info) : 0;
+-						char *path_info = env_path_info ? env_path_info + pilen - slen : NULL;
+-
+-						if (orig_path_info != path_info) {
++						char *path_info = (env_path_info && pilen > slen) ? env_path_info + pilen - slen : NULL;
++
++						if (path_info && orig_path_info != path_info) {
+ 							if (orig_path_info) {
+ 								char old;
+ 
+--- a/sapi/fpm/fpm/fpm_children.c
++++ b/sapi/fpm/fpm/fpm_children.c
+@@ -68,7 +68,11 @@
+ 			fpm_event_fire(&child->ev_stdout);
+ 		}
+ 		if (child->fd_stdout != -1) {
++			if (in_event_loop) {
++				fpm_event_del(&child->ev_stdout);
++			}
+ 			close(child->fd_stdout);
++			child->fd_stdout = -1;
+ 		}
+ 	}
+ 
+@@ -77,7 +81,11 @@
+ 			fpm_event_fire(&child->ev_stderr);
+ 		}
+ 		if (child->fd_stderr != -1) {
++			if (in_event_loop) {
++				fpm_event_del(&child->ev_stderr);
++			}
+ 			close(child->fd_stderr);
++			child->fd_stderr = -1;
+ 		}
+ 	}
+ 
+@@ -243,7 +251,7 @@
+ 
+ 			fpm_child_unlink(child);
+ 
+-			fpm_scoreboard_proc_free(wp->scoreboard, child->scoreboard_i);
++			fpm_scoreboard_proc_free(child);
+ 
+ 			fpm_clock_get(&tv1);
+ 
+@@ -253,9 +261,9 @@
+ 				if (!fpm_pctl_can_spawn_children()) {
+ 					severity = ZLOG_DEBUG;
+ 				}
+-				zlog(severity, "[pool %s] child %d exited %s after %ld.%06d seconds from start", child->wp->config->name, (int) pid, buf, tv2.tv_sec, (int) tv2.tv_usec);
++				zlog(severity, "[pool %s] child %d exited %s after %ld.%06d seconds from start", wp->config->name, (int) pid, buf, tv2.tv_sec, (int) tv2.tv_usec);
+ 			} else {
+-				zlog(ZLOG_DEBUG, "[pool %s] child %d has been killed by the process management after %ld.%06d seconds from start", child->wp->config->name, (int) pid, tv2.tv_sec, (int) tv2.tv_usec);
++				zlog(ZLOG_DEBUG, "[pool %s] child %d has been killed by the process management after %ld.%06d seconds from start", wp->config->name, (int) pid, tv2.tv_sec, (int) tv2.tv_usec);
+ 			}
+ 
+ 			fpm_child_close(child, 1 /* in event_loop */);
+@@ -321,7 +329,7 @@
+ 		return 0;
+ 	}
+ 
+-	if (0 > fpm_scoreboard_proc_alloc(wp->scoreboard, &c->scoreboard_i)) {
++	if (0 > fpm_scoreboard_proc_alloc(c)) {
+ 		fpm_stdio_discard_pipes(c);
+ 		fpm_child_free(c);
+ 		return 0;
+@@ -333,7 +341,7 @@
+ 
+ static void fpm_resources_discard(struct fpm_child_s *child) /* {{{ */
+ {
+-	fpm_scoreboard_proc_free(child->wp->scoreboard, child->scoreboard_i);
++	fpm_scoreboard_proc_free(child);
+ 	fpm_stdio_discard_pipes(child);
+ 	fpm_child_free(child);
+ }
+@@ -346,10 +354,10 @@
+ 		if (wp == child->wp) {
+ 			continue;
+ 		}
+-		fpm_scoreboard_free(wp->scoreboard);
+-	}
+-
+-	fpm_scoreboard_child_use(child->wp->scoreboard, child->scoreboard_i, getpid());
++		fpm_scoreboard_free(wp);
++	}
++
++	fpm_scoreboard_child_use(child, getpid());
+ 	fpm_stdio_child_use_pipes(child);
+ 	fpm_child_free(child);
+ }
+--- a/sapi/fpm/fpm/fpm_request.c
++++ b/sapi/fpm/fpm/fpm_request.c
+@@ -286,7 +286,7 @@
+ 	struct fpm_scoreboard_proc_s *proc;
+ 
+ 	/* no need in atomicity here */
+-	proc = fpm_scoreboard_proc_get(child->wp->scoreboard, child->scoreboard_i);
++	proc = fpm_scoreboard_proc_get_from_child(child);
+ 	if (!proc) {
+ 		return 0;
+ 	}
+@@ -301,7 +301,7 @@
+ 
+ 	if (!tv) return -1;
+ 
+-	proc = fpm_scoreboard_proc_get(child->wp->scoreboard, child->scoreboard_i);
++	proc = fpm_scoreboard_proc_get_from_child(child);
+ 	if (!proc) {
+ 		return -1;
+ 	}
+--- a/sapi/fpm/fpm/fpm_scoreboard.c
++++ b/sapi/fpm/fpm/fpm_scoreboard.c
+@@ -7,6 +7,7 @@
+ #include <time.h>
+ 
+ #include "fpm_config.h"
++#include "fpm_children.h"
+ #include "fpm_scoreboard.h"
+ #include "fpm_shm.h"
+ #include "fpm_sockets.h"
+@@ -24,7 +25,6 @@
+ int fpm_scoreboard_init_main() /* {{{ */
+ {
+ 	struct fpm_worker_pool_s *wp;
+-	unsigned int i;
+ 
+ #ifdef HAVE_TIMES
+ #if (defined(HAVE_SYSCONF) && defined(_SC_CLK_TCK))
+@@ -41,7 +41,7 @@
+ 
+ 
+ 	for (wp = fpm_worker_all_pools; wp; wp = wp->next) {
+-		size_t scoreboard_size, scoreboard_nprocs_size;
++		size_t scoreboard_procs_size;
+ 		void *shm_mem;
+ 
+ 		if (wp->config->pm_max_children < 1) {
+@@ -54,22 +54,15 @@
+ 			return -1;
+ 		}
+ 
+-		scoreboard_size        = sizeof(struct fpm_scoreboard_s) + (wp->config->pm_max_children) * sizeof(struct fpm_scoreboard_proc_s *);
+-		scoreboard_nprocs_size = sizeof(struct fpm_scoreboard_proc_s) * wp->config->pm_max_children;
+-		shm_mem                = fpm_shm_alloc(scoreboard_size + scoreboard_nprocs_size);
++		scoreboard_procs_size = sizeof(struct fpm_scoreboard_proc_s) * wp->config->pm_max_children;
++		shm_mem = fpm_shm_alloc(sizeof(struct fpm_scoreboard_s) + scoreboard_procs_size);
+ 
+ 		if (!shm_mem) {
+ 			return -1;
+ 		}
+-		wp->scoreboard         = shm_mem;
++		wp->scoreboard = shm_mem;
++		wp->scoreboard->pm = wp->config->pm;
+ 		wp->scoreboard->nprocs = wp->config->pm_max_children;
+-		shm_mem               += scoreboard_size;
+-
+-		for (i = 0; i < wp->scoreboard->nprocs; i++, shm_mem += sizeof(struct fpm_scoreboard_proc_s)) {
+-			wp->scoreboard->procs[i] = shm_mem;
+-		}
+-
+-		wp->scoreboard->pm          = wp->config->pm;
+ 		wp->scoreboard->start_epoch = time(NULL);
+ 		strlcpy(wp->scoreboard->pool, wp->config->name, sizeof(wp->scoreboard->pool));
+ 	}
+@@ -163,27 +156,47 @@
+ }
+ /* }}} */
+ 
+-struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get(struct fpm_scoreboard_s *scoreboard, int child_index) /* {{{*/
++static inline struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get_ex(
++		struct fpm_scoreboard_s *scoreboard, int child_index, unsigned int nprocs) /* {{{*/
++{
++	if (!scoreboard) {
++		return NULL;
++	}
++
++	if (child_index < 0 || (unsigned int)child_index >= nprocs) {
++		return NULL;
++	}
++
++	return &scoreboard->procs[child_index];
++}
++/* }}} */
++
++struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get(
++		struct fpm_scoreboard_s *scoreboard, int child_index) /* {{{*/
+ {
+ 	if (!scoreboard) {
+ 		scoreboard = fpm_scoreboard;
+-	}
+-
+-	if (!scoreboard) {
+-		return NULL;
+ 	}
+ 
+ 	if (child_index < 0) {
+ 		child_index = fpm_scoreboard_i;
+ 	}
+ 
+-	if (child_index < 0 || (unsigned int)child_index >= scoreboard->nprocs) {
+-		return NULL;
+-	}
+-
+-	return scoreboard->procs[child_index];
+-}
+-/* }}} */
++	return fpm_scoreboard_proc_get_ex(scoreboard, child_index, scoreboard->nprocs);
++}
++/* }}} */
++
++struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get_from_child(struct fpm_child_s *child) /* {{{*/
++{
++	struct fpm_worker_pool_s *wp = child->wp;
++	unsigned int nprocs = wp->config->pm_max_children;
++	struct fpm_scoreboard_s *scoreboard = wp->scoreboard;
++	int child_index = child->scoreboard_i;
++
++	return fpm_scoreboard_proc_get_ex(scoreboard, child_index, nprocs);
++}
++/* }}} */
++
+ 
+ struct fpm_scoreboard_s *fpm_scoreboard_acquire(struct fpm_scoreboard_s *scoreboard, int nohang) /* {{{ */
+ {
+@@ -235,28 +248,28 @@
+ 	proc->lock = 0;
+ }
+ 
+-void fpm_scoreboard_free(struct fpm_scoreboard_s *scoreboard) /* {{{ */
+-{
+-	size_t scoreboard_size, scoreboard_nprocs_size;
++void fpm_scoreboard_free(struct fpm_worker_pool_s *wp) /* {{{ */
++{
++	size_t scoreboard_procs_size;
++	struct fpm_scoreboard_s *scoreboard = wp->scoreboard;
+ 
+ 	if (!scoreboard) {
+ 		zlog(ZLOG_ERROR, "**scoreboard is NULL");
+ 		return;
+ 	}
+ 
+-	scoreboard_size        = sizeof(struct fpm_scoreboard_s) + (scoreboard->nprocs) * sizeof(struct fpm_scoreboard_proc_s *);
+-	scoreboard_nprocs_size = sizeof(struct fpm_scoreboard_proc_s) * scoreboard->nprocs;
+-
+-	fpm_shm_free(scoreboard, scoreboard_size + scoreboard_nprocs_size);
+-}
+-/* }}} */
+-
+-void fpm_scoreboard_child_use(struct fpm_scoreboard_s *scoreboard, int child_index, pid_t pid) /* {{{ */
++	scoreboard_procs_size = sizeof(struct fpm_scoreboard_proc_s) * wp->config->pm_max_children;
++
++	fpm_shm_free(scoreboard, sizeof(struct fpm_scoreboard_s) + scoreboard_procs_size);
++}
++/* }}} */
++
++void fpm_scoreboard_child_use(struct fpm_child_s *child, pid_t pid) /* {{{ */
+ {
+ 	struct fpm_scoreboard_proc_s *proc;
+-	fpm_scoreboard = scoreboard;
+-	fpm_scoreboard_i = child_index;
+-	proc = fpm_scoreboard_proc_get(scoreboard, child_index);
++	fpm_scoreboard = child->wp->scoreboard;
++	fpm_scoreboard_i = child->scoreboard_i;
++	proc = fpm_scoreboard_proc_get_from_child(child);
+ 	if (!proc) {
+ 		return;
+ 	}
+@@ -265,18 +278,22 @@
+ }
+ /* }}} */
+ 
+-void fpm_scoreboard_proc_free(struct fpm_scoreboard_s *scoreboard, int child_index) /* {{{ */
+-{
+-	if (!scoreboard) {
+-		return;
+-	}
+-
+-	if (child_index < 0 || (unsigned int)child_index >= scoreboard->nprocs) {
+-		return;
+-	}
+-
+-	if (scoreboard->procs[child_index] && scoreboard->procs[child_index]->used > 0) {
+-		memset(scoreboard->procs[child_index], 0, sizeof(struct fpm_scoreboard_proc_s));
++void fpm_scoreboard_proc_free(struct fpm_child_s *child) /* {{{ */
++{
++	struct fpm_worker_pool_s *wp = child->wp;
++	struct fpm_scoreboard_s *scoreboard = wp->scoreboard;
++	int child_index = child->scoreboard_i;
++
++	if (!scoreboard) {
++		return;
++	}
++
++	if (child_index < 0 || child_index >= wp->config->pm_max_children) {
++		return;
++	}
++
++	if (scoreboard->procs[child_index].used > 0) {
++		memset(&scoreboard->procs[child_index], 0, sizeof(struct fpm_scoreboard_proc_s));
+ 	}
+ 
+ 	/* set this slot as free to avoid search on next alloc */
+@@ -284,41 +301,44 @@
+ }
+ /* }}} */
+ 
+-int fpm_scoreboard_proc_alloc(struct fpm_scoreboard_s *scoreboard, int *child_index) /* {{{ */
++int fpm_scoreboard_proc_alloc(struct fpm_child_s *child) /* {{{ */
+ {
+ 	int i = -1;
+-
+-	if (!scoreboard || !child_index) {
++	struct fpm_worker_pool_s *wp = child->wp;
++	struct fpm_scoreboard_s *scoreboard = wp->scoreboard;
++	int nprocs = wp->config->pm_max_children;
++
++	if (!scoreboard) {
+ 		return -1;
+ 	}
+ 
+ 	/* first try the slot which is supposed to be free */
+-	if (scoreboard->free_proc >= 0 && (unsigned int)scoreboard->free_proc < scoreboard->nprocs) {
+-		if (scoreboard->procs[scoreboard->free_proc] && !scoreboard->procs[scoreboard->free_proc]->used) {
++	if (scoreboard->free_proc >= 0 && scoreboard->free_proc < nprocs) {
++		if (!scoreboard->procs[scoreboard->free_proc].used) {
+ 			i = scoreboard->free_proc;
+ 		}
+ 	}
+ 
+ 	if (i < 0) { /* the supposed free slot is not, let's search for a free slot */
+ 		zlog(ZLOG_DEBUG, "[pool %s] the proc->free_slot was not free. Let's search", scoreboard->pool);
+-		for (i = 0; i < (int)scoreboard->nprocs; i++) {
+-			if (scoreboard->procs[i] && !scoreboard->procs[i]->used) { /* found */
++		for (i = 0; i < nprocs; i++) {
++			if (!scoreboard->procs[i].used) { /* found */
+ 				break;
+ 			}
+ 		}
+ 	}
+ 
+ 	/* no free slot */
+-	if (i < 0 || i >= (int)scoreboard->nprocs) {
++	if (i < 0 || i >= nprocs) {
+ 		zlog(ZLOG_ERROR, "[pool %s] no free scoreboard slot", scoreboard->pool);
+ 		return -1;
+ 	}
+ 
+-	scoreboard->procs[i]->used = 1;
+-	*child_index = i;
++	scoreboard->procs[i].used = 1;
++	child->scoreboard_i = i;
+ 
+ 	/* supposed next slot is free */
+-	if (i + 1 >= (int)scoreboard->nprocs) {
++	if (i + 1 >= nprocs) {
+ 		scoreboard->free_proc = 0;
+ 	} else {
+ 		scoreboard->free_proc = i + 1;
+--- a/sapi/fpm/fpm/fpm_scoreboard.h
++++ b/sapi/fpm/fpm/fpm_scoreboard.h
+@@ -64,7 +64,7 @@
+ 	unsigned int nprocs;
+ 	int free_proc;
+ 	unsigned long int slow_rq;
+-	struct fpm_scoreboard_proc_s *procs[];
++	struct fpm_scoreboard_proc_s procs[];
+ };
+ 
+ int fpm_scoreboard_init_main();
+@@ -73,18 +73,19 @@
+ void fpm_scoreboard_update(int idle, int active, int lq, int lq_len, int requests, int max_children_reached, int slow_rq, int action, struct fpm_scoreboard_s *scoreboard);
+ struct fpm_scoreboard_s *fpm_scoreboard_get();
+ struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get(struct fpm_scoreboard_s *scoreboard, int child_index);
++struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_get_from_child(struct fpm_child_s *child);
+ 
+ struct fpm_scoreboard_s *fpm_scoreboard_acquire(struct fpm_scoreboard_s *scoreboard, int nohang);
+ void fpm_scoreboard_release(struct fpm_scoreboard_s *scoreboard);
+ struct fpm_scoreboard_proc_s *fpm_scoreboard_proc_acquire(struct fpm_scoreboard_s *scoreboard, int child_index, int nohang);
+ void fpm_scoreboard_proc_release(struct fpm_scoreboard_proc_s *proc);
+ 
+-void fpm_scoreboard_free(struct fpm_scoreboard_s *scoreboard);
++void fpm_scoreboard_free(struct fpm_worker_pool_s *wp);
+ 
+-void fpm_scoreboard_child_use(struct fpm_scoreboard_s *scoreboard, int child_index, pid_t pid);
++void fpm_scoreboard_child_use(struct fpm_child_s *child, pid_t pid);
+ 
+-void fpm_scoreboard_proc_free(struct fpm_scoreboard_s *scoreboard, int child_index);
+-int fpm_scoreboard_proc_alloc(struct fpm_scoreboard_s *scoreboard, int *child_index);
++void fpm_scoreboard_proc_free(struct fpm_child_s *child);
++int fpm_scoreboard_proc_alloc(struct fpm_child_s *child);
+ 
+ #ifdef HAVE_TIMES
+ float fpm_scoreboard_get_tick();
+--- a/sapi/fpm/fpm/fpm_status.c
++++ b/sapi/fpm/fpm/fpm_status.c
+@@ -44,6 +44,20 @@
+ 	return 0;
+ }
+ /* }}} */
++
++static char *fpm_status_escape(char *str, int encode, zend_string **tmp)
++{
++	*tmp = NULL;
++	if (str[0] == '\0') {
++		return NULL;
++	}
++	if (encode) {
++		*tmp = php_escape_html_entities_ex((unsigned char *) str, strlen(str), 1,
++				ENT_DISALLOWED | ENT_HTML_DOC_XML1 | ENT_COMPAT, NULL, /* double_encode */ 1);
++		return ZSTR_VAL(*tmp);
++	}
++	return str;
++}
+ 
+ int fpm_status_handle_request(void) /* {{{ */
+ {
+@@ -387,8 +401,10 @@
+ 		if (full_syntax) {
+ 			unsigned int i;
+ 			int first;
+-			zend_string *tmp_query_string;
+-			char *query_string;
++			zend_string *tmp_request_method_string, *tmp_request_uri_string, *tmp_query_string;
++			zend_string *tmp_auth_user_string, *tmp_script_filename_string;
++			char *request_method_string, *request_uri_string, *query_string;
++			char *auth_user_string, *script_filename_string;
+ 			struct timeval duration, now;
+ #ifdef HAVE_FPM_LQ
+ 			float cpu;
+@@ -402,10 +418,10 @@
+ 
+ 			first = 1;
+ 			for (i=0; i<scoreboard_p->nprocs; i++) {
+-				if (!scoreboard_p->procs[i] || !scoreboard_p->procs[i]->used) {
++				if (!scoreboard_p->procs[i].used) {
+ 					continue;
+ 				}
+-				proc = *scoreboard_p->procs[i];
++				proc = scoreboard_p->procs[i];
+ 
+ 				if (first) {
+ 					first = 0;
+@@ -415,16 +431,11 @@
+ 					}
+ 				}
+ 
+-				query_string = NULL;
+-				tmp_query_string = NULL;
+-				if (proc.query_string[0] != '\0') {
+-					if (!encode) {
+-						query_string = proc.query_string;
+-					} else {
+-						tmp_query_string = php_escape_html_entities_ex((unsigned char *)proc.query_string, strlen(proc.query_string), 1, ENT_HTML_IGNORE_ERRORS & ENT_COMPAT, NULL, 1);
+-						query_string = ZSTR_VAL(tmp_query_string);
+-					}
+-				}
++				request_method_string = fpm_status_escape(proc.request_method, encode, &tmp_request_method_string);
++				request_uri_string = fpm_status_escape(proc.request_uri, encode, &tmp_request_uri_string);
++				query_string = fpm_status_escape(proc.query_string, encode, &tmp_query_string);
++				auth_user_string = fpm_status_escape(proc.auth_user, encode, &tmp_auth_user_string);
++				script_filename_string = fpm_status_escape(proc.script_filename, encode, &tmp_script_filename_string);
+ 
+ #ifdef HAVE_FPM_LQ
+ 				/* prevent NaN */
+@@ -448,13 +459,13 @@
+ 					now_epoch - proc.start_epoch,
+ 					proc.requests,
+ 					duration.tv_sec * 1000000UL + duration.tv_usec,
+-					proc.request_method[0] != '\0' ? proc.request_method : "-",
+-					proc.request_uri[0] != '\0' ? proc.request_uri : "-",
++					request_method_string ? request_method_string : "-",
++					request_uri_string ? request_uri_string : "-",
+ 					query_string ? "?" : "",
+ 					query_string ? query_string : "",
+ 					proc.content_length,
+-					proc.auth_user[0] != '\0' ? proc.auth_user : "-",
+-					proc.script_filename[0] != '\0' ? proc.script_filename : "-",
++					auth_user_string ? auth_user_string : "-",
++					script_filename_string ? script_filename_string : "-",
+ #ifdef HAVE_FPM_LQ
+ 					proc.request_stage == FPM_REQUEST_ACCEPTING ? cpu : 0.,
+ #endif
+@@ -462,8 +473,20 @@
+ 				PUTS(buffer);
+ 				efree(buffer);
+ 
++				if (tmp_request_method_string) {
++					zend_string_free(tmp_request_method_string);
++				}
++				if (tmp_request_uri_string) {
++					zend_string_free(tmp_request_uri_string);
++				}
+ 				if (tmp_query_string) {
+ 					zend_string_free(tmp_query_string);
++				}
++				if (tmp_auth_user_string) {
++					zend_string_free(tmp_auth_user_string);
++				}
++				if (tmp_script_filename_string) {
++					zend_string_free(tmp_script_filename_string);
+ 				}
+ 			}
+ 
+--- a/sapi/fpm/fpm/fpm_worker_pool.c
++++ b/sapi/fpm/fpm/fpm_worker_pool.c
+@@ -43,7 +43,7 @@
+ 		fpm_worker_pool_config_free(wp->config);
+ 		fpm_children_free(wp->children);
+ 		if ((which & FPM_CLEANUP_CHILD) == 0 && fpm_globals.parent_pid == getpid()) {
+-			fpm_scoreboard_free(wp->scoreboard);
++			fpm_scoreboard_free(wp);
+ 		}
+ 		fpm_worker_pool_free(wp);
+ 	}

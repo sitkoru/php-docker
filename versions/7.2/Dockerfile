@@ -21,6 +21,7 @@ RUN bash /install.sh redis-6.0.2 memcached-3.2.0 memcache-4.0.5.2
 
 FROM upstream AS base
 COPY --from=build /usr/local/ /usr/local/
+COPY --from=build /usr/src/php.tar.xz /usr/src/php.tar.xz
 COPY scripts/configure-runtime.sh /configure-runtime.sh
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 COPY opcache.conf /usr/local/etc/php/conf.d/docker-php-ext-opcache.ini
